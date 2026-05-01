@@ -237,6 +237,63 @@ def test_current_shows_distilled_state(tmp_path: Path, capsys):
     assert "extended/:" in out
 
 
+def test_history_lists_snapshots(tmp_path: Path, fixtures_dir: Path, capsys):
+    home = tmp_path / "home"
+    run("import", "--card", str(fixtures_dir / "v2_minimal.json"), "--home", str(home))
+    capsys.readouterr()
+    assert run("history", "--home", str(home)) == 0
+    out = capsys.readouterr().out
+    assert "0001" in out
+    assert "pristine" in out
+    assert "0002" in out
+    assert "import" in out
+    assert "Echo" in out
+
+
+def test_revert_to_pristine_via_cli(tmp_path: Path, fixtures_dir: Path, capsys):
+    home = tmp_path / "home"
+    run("import", "--card", str(fixtures_dir / "v2_with_book.json"), "--home", str(home))
+    capsys.readouterr()
+    assert (home / "SOUL.md").exists()
+    assert (home / "HERMES.md").exists()
+    rc = run("revert", "--home", str(home), "--to", "pristine")
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "reverted to snapshot 0001" in out
+    # Live files removed (pristine had none)
+    assert not (home / "SOUL.md").exists()
+    assert not (home / "HERMES.md").exists()
+
+
+def test_revert_previous_via_cli(tmp_path: Path, fixtures_dir: Path, capsys):
+    home = tmp_path / "home"
+    run("import", "--card", str(fixtures_dir / "v2_minimal.json"), "--home", str(home))
+    run("import", "--card", str(fixtures_dir / "v2_full.json"), "--home", str(home),
+        "--overwrite")
+    capsys.readouterr()
+    assert run("revert", "--home", str(home), "--previous") == 0
+    soul = (home / "SOUL.md").read_text()
+    assert "Echo" in soul
+
+
+def test_revert_unknown_target_returns_failure(tmp_path: Path, fixtures_dir: Path, capsys):
+    home = tmp_path / "home"
+    run("import", "--card", str(fixtures_dir / "v2_minimal.json"), "--home", str(home))
+    capsys.readouterr()
+    rc = run("revert", "--home", str(home), "--to", "9999")
+    assert rc == 2
+    err = capsys.readouterr().err
+    assert "no snapshot" in err
+
+
+def test_import_stderr_mentions_new_and_reset(tmp_path: Path, fixtures_dir: Path, capsys):
+    home = tmp_path / "home"
+    run("import", "--card", str(fixtures_dir / "v2_minimal.json"), "--home", str(home))
+    err = capsys.readouterr().err
+    assert "/new" in err
+    assert "/reset" in err
+
+
 def test_switch_unknown_card_fails(tmp_path: Path, fixtures_dir: Path, capsys):
     home = tmp_path / "home"
     assert run("import", "--card", str(fixtures_dir / "v2_minimal.json"),

@@ -56,6 +56,10 @@ What we deliberately don't do:
   portion and lays out the full original content for runtime retrieval
 - **Card library** — list / current / switch / delete / restore over
   the cards imported into a `HERMES_HOME`
+- **Snapshot history** — every `import` / `switch` / `revert` is
+  captured under `cards/.snapshots/`, with a special `pristine`
+  snapshot of the pre-HermesTavern state. `revert --to pristine` /
+  `--previous` / `--to <id|name>` walks the history
 - **Channel-agnostic** — produces the persona files Hermes loads at
   startup; everything Hermes can talk on is automatically in character
 
@@ -126,6 +130,12 @@ hermes-tavern switch  --card alice --home ~/.hermes-roleplay
 hermes-tavern delete  --card bob   --home ~/.hermes-roleplay
 hermes-tavern restore --card bob   --home ~/.hermes-roleplay
 
+# SOUL.md / HERMES.md snapshot history (every import/switch is captured)
+hermes-tavern history --home ~/.hermes-roleplay
+hermes-tavern revert  --home ~/.hermes-roleplay --to pristine     # back to pre-card state
+hermes-tavern revert  --home ~/.hermes-roleplay --previous        # one back
+hermes-tavern revert  --home ~/.hermes-roleplay --to 0003
+
 # Trust the card author's system_prompt / post_history_instructions
 # (default is to render them inside untrusted blockquotes)
 hermes-tavern import ... --trust-system-prompt
@@ -156,6 +166,7 @@ size. The threshold is 75% of the Hermes 20k slot — i.e. 15,000 chars
 │                                       card has a character_book)
 └── cards/
     ├── .active.json                 ← currently active card pointer
+    ├── .snapshots/<NNNN>_…/         ← SOUL.md / HERMES.md history
     ├── .trash/                      ← soft-deleted cards (delete/restore)
     └── <name>_<ts>.<ext>            ← original card backup
 ```

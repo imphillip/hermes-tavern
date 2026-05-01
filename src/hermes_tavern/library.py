@@ -47,8 +47,10 @@ from typing import Any
 
 from . import distill as distill_mod
 from . import extended as extended_mod
+from . import snapshots as snap_mod
 from .parse import load_card
 from .render import SOUL_BUDGET, BudgetExceededError, RenderResult, render
+from .snapshots import Snapshot, SnapshotError
 
 DEFAULT_USER_NOUN = "the visitor"
 _ACTIVE_FILE = ".active.json"
@@ -344,8 +346,16 @@ def apply_card(
     allow_distill: bool = True,
     distill_command: str = distill_mod.DEFAULT_DISTILL_CMD,
     distill_runner: object | None = None,
+    action: str = "apply",
 ) -> ApplyOutcome:
-    """Render and write SOUL/HERMES (and AGENTS+extended in distilled mode)."""
+    """Render and write SOUL/HERMES (and extended in distilled mode).
+
+    Captures a pristine snapshot on first invocation, then a snapshot
+    after the mutation completes — allowing later ``revert`` operations.
+    """
+    # Snapshot the pristine state before any HermesTavern write.
+    snap_mod.ensure_pristine(home, soul=soul_path(home), hermes=hermes_path(home))
+
     data = load_card(card_path)
     # Render without budget enforcement so oversized output can still flow
     # into the distillation pipeline; we re-impose the hard cap manually
@@ -387,6 +397,15 @@ def apply_card(
             distilled=False,
         )
         write_active(home, record)
+        snap_mod.take_snapshot(
+            home,
+            action=action,
+            name=char_name,
+            card_file=card_path.name,
+            soul=soul_path(home),
+            hermes=hermes_path(home),
+            active_record=asdict(record),
+        )
         return ApplyOutcome(rendered=rendered, wrote_hermes_md=wrote_hermes, distilled=False)
 
     # Distillation path.
@@ -419,6 +438,15 @@ def apply_card(
         extended_dir=str(extended_dir.relative_to(home)),
     )
     write_active(home, record)
+    snap_mod.take_snapshot(
+        home,
+        action=action,
+        name=char_name,
+        card_file=card_path.name,
+        soul=soul_path(home),
+        hermes=hermes_path(home),
+        active_record=asdict(record),
+    )
     return ApplyOutcome(
         rendered=rendered,
         wrote_hermes_md=True,
@@ -455,6 +483,7 @@ def import_card(
         allow_distill=allow_distill,
         distill_command=distill_command,
         distill_runner=distill_runner,
+        action="import",
     )
     return outcome, library_path
 
@@ -539,6 +568,7 @@ def switch_to(
         allow_distill=allow_distill,
         distill_command=distill_command,
         distill_runner=distill_runner,
+        action="switch",
     )
     return target, outcome
 
@@ -549,3 +579,46 @@ def get_meta(card_path: Path) -> dict[str, Any]:
         return load_card(card_path)
     except Exception:
         return {}
+
+
+def list_history(home: Path) -> list[Snapshot]:
+    """Chronological list of SOUL.md / HERMES.md snapshots."""
+    return snap_mod.list_snapshots(home)
+
+
+def revert_to(home: Path, query: str) -> Snapshot:
+    """Restore SOUL.md / HERMES.md from a snapshot named by ``query``.
+
+    ``query`` may be ``"pristine"``, ``"previous"``, a numeric snapshot
+    id, or a case-insensitive name prefix. The current state is replaced
+    in-place — including correctly removing live files when the target
+    snapshot didn't have them. The active record is restored from the
+    snapshot's manifest, or cleared if the target had none. The revert
+    itself is recorded as a new snapshot for history continuity.
+    """
+    target = snap_mod.find_snapshot(home, query)
+    snap_mod.restore_files(target, home, soul=soul_path(home), hermes=hermes_path(home))
+
+    if target.active_record:
+        record = ActiveRecord(
+            **{
+                k: target.active_record.get(k)
+                for k in ActiveRecord.__dataclass_fields__
+            }
+        )
+        write_active(home, record)
+    else:
+        clear_active(home)
+
+    # Record the revert as a new snapshot for traceability — includes the
+    # current state which now matches `target`.
+    snap_mod.take_snapshot(
+        home,
+        action="revert",
+        name=f"revert→{target.id}/{target.name}",
+        card_file=target.card_file,
+        soul=soul_path(home),
+        hermes=hermes_path(home),
+        active_record=target.active_record,
+    )
+    return target

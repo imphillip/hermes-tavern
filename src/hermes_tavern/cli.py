@@ -12,6 +12,7 @@ from .distill import DEFAULT_DISTILL_CMD, DistillationError
 from .parse import CardError, load_card
 from .render import BudgetExceededError, render
 from .scan import Finding, scan_card
+from .snapshots import SnapshotError
 
 _EXIT_OK = 0
 _EXIT_USAGE = 2
@@ -31,6 +32,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"hermes-tavern: card error: {exc}", file=sys.stderr)
         return _EXIT_USAGE
     except library.LibraryError as exc:
+        print(f"hermes-tavern: {exc}", file=sys.stderr)
+        return _EXIT_USAGE
+    except SnapshotError as exc:
         print(f"hermes-tavern: {exc}", file=sys.stderr)
         return _EXIT_USAGE
     except DistillationError as exc:
@@ -121,6 +125,34 @@ def _build_parser() -> argparse.ArgumentParser:
     p_restore.add_argument("--card", required=True)
     p_restore.add_argument("--home", required=True, type=Path)
     p_restore.set_defaults(handler=_cmd_restore)
+
+    p_history = sub.add_parser(
+        "history",
+        help="Show the chronological list of SOUL.md / HERMES.md snapshots.",
+    )
+    p_history.add_argument("--home", required=True, type=Path)
+    p_history.set_defaults(handler=_cmd_history)
+
+    p_revert = sub.add_parser(
+        "revert",
+        help="Restore SOUL.md / HERMES.md from a snapshot in the history.",
+    )
+    p_revert.add_argument("--home", required=True, type=Path)
+    target_grp = p_revert.add_mutually_exclusive_group(required=True)
+    target_grp.add_argument(
+        "--to",
+        dest="target",
+        help="Snapshot id (e.g. '0001'), name prefix (e.g. 'Aldous'), "
+             "or the special tokens 'pristine' / 'previous'.",
+    )
+    target_grp.add_argument(
+        "--previous",
+        dest="target",
+        action="store_const",
+        const="previous",
+        help="Shortcut for --to previous (one snapshot back).",
+    )
+    p_revert.set_defaults(handler=_cmd_revert)
 
     return parser
 
@@ -273,6 +305,35 @@ def _cmd_restore(args: argparse.Namespace) -> int:
     return _EXIT_OK
 
 
+def _cmd_history(args: argparse.Namespace) -> int:
+    snaps = library.list_history(args.home)
+    if not snaps:
+        print("(no snapshots — run `hermes-tavern import` first)")
+        return _EXIT_OK
+    print(f"{'id':<6} {'when':<20} {'action':<10} {'name':<30} files")
+    for s in snaps:
+        marker = ("S" if s.has_soul_md else "-") + ("H" if s.has_hermes_md else "-")
+        when = s.created_at.split("+")[0]
+        print(f"{s.id:<6} {when:<20} {s.action:<10} {s.name:<30} {marker}")
+    print("\n(files: S=SOUL.md present, H=HERMES.md present; "
+          "'--' = pristine state with no HermesTavern files)")
+    return _EXIT_OK
+
+
+def _cmd_revert(args: argparse.Namespace) -> int:
+    target = library.revert_to(args.home, args.target)
+    soul_state = "yes" if target.has_soul_md else "(none — live SOUL.md removed)"
+    hermes_state = "yes" if target.has_hermes_md else "(none — live HERMES.md removed)"
+    print(f"reverted to snapshot {target.id} ({target.action}: {target.name})")
+    print(f"  SOUL.md:   {soul_state}")
+    print(f"  HERMES.md: {hermes_state}")
+    print(f"\nto activate: cd {args.home} && hermes", file=sys.stderr)
+    print("(if hermes is already running in a channel, use /new for a fresh "
+          "session — or /reset to clear and reload — to apply this revert)",
+          file=sys.stderr)
+    return _EXIT_OK
+
+
 def _report_outcome(home: Path, outcome: library.ApplyOutcome, library_path: Path,
                     *, soul_only: bool) -> None:
     """Print a one-screen summary of what was written."""
@@ -304,6 +365,9 @@ def _report_outcome(home: Path, outcome: library.ApplyOutcome, library_path: Pat
     print(f"\nto activate: cd {home} && hermes", file=sys.stderr)
     print("(HERMES.md is read from cwd, not HERMES_HOME — must launch from "
           "inside the home directory)", file=sys.stderr)
+    print("(if hermes is already running in a channel, use /new for a fresh "
+          "session — or /reset to clear and reload — to apply this card)",
+          file=sys.stderr)
 
 
 def _emit_findings(findings: list[Finding], *, trust_system_prompt: bool) -> None:

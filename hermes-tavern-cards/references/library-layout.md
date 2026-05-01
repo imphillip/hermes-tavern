@@ -47,6 +47,46 @@ Distillation mode merges the index into `HERMES.md`. See
 the lorebook / extended-file index won't be loaded. `SOUL.md` is the
 exception — it's anchored to `HERMES_HOME` regardless of cwd.
 
+If `hermes` is already running in a channel when SOUL.md / HERMES.md
+are updated, the model's system prompt is cached at session start —
+the new files don't apply automatically. The user can either:
+
+- run `/new` in the channel to start a fresh session, or
+- run `/reset` in the channel to clear and reload
+
+Both pick up the updated files. HermesTavern prints this reminder to
+stderr after every `import` / `switch` / `revert`.
+
+## `.snapshots/` — SOUL.md / HERMES.md history
+
+Every `import` / `switch` / `revert` captures the resulting on-disk
+state into `cards/.snapshots/<NNNN>_<ts>_<name>/`. Before the very
+first mutation, a special `pristine` snapshot records the
+pre-HermesTavern state (which may legitimately be "no SOUL.md or
+HERMES.md existed"):
+
+```
+<HERMES_HOME>/cards/.snapshots/
+├── 0001_pristine/
+│   ├── manifest.json
+│   └── (SOUL.md / HERMES.md if they existed pre-HermesTavern)
+├── 0002_20260502T130000_Aldous/
+│   ├── manifest.json
+│   ├── SOUL.md
+│   └── HERMES.md
+└── ...
+```
+
+`hermes-tavern history --home <home>` lists snapshots chronologically.
+`hermes-tavern revert --home <home> --to <id|name|pristine|previous>`
+restores any of them — correctly removing the live SOUL.md / HERMES.md
+when the target snapshot didn't have them (this is what makes "revert
+to pristine when nothing existed before" work). The active record is
+restored from the snapshot's manifest, or cleared if the target had
+none.
+
+The revert action is itself recorded as a new snapshot for traceability.
+
 ## `.active.json`
 
 ```json

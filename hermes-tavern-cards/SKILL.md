@@ -29,6 +29,7 @@ signals:
 - "list my characters", "show all imported cards"
 - "delete the X card", "remove the Bob persona"
 - "bring back the card I deleted", "undelete X", "restore the previous one"
+- "go back to before I loaded any card", "revert to the previous SOUL", "show me the snapshot history"
 
 For the **first-time import** of a fresh `.png` / `.json` / `.yaml` card,
 use the sibling skill `hermes-tavern` instead.
@@ -89,6 +90,15 @@ hermes-tavern delete --card bob --home ~/.hermes-roleplay
 
 # Bring it back
 hermes-tavern restore --card bob --home ~/.hermes-roleplay
+
+# See SOUL.md / HERMES.md snapshot history
+hermes-tavern history --home ~/.hermes-roleplay
+
+# Revert SOUL.md / HERMES.md to a snapshot
+hermes-tavern revert --home ~/.hermes-roleplay --to pristine    # back to before any card
+hermes-tavern revert --home ~/.hermes-roleplay --to alice       # back to when alice was active
+hermes-tavern revert --home ~/.hermes-roleplay --to 0003        # back to snapshot 0003
+hermes-tavern revert --home ~/.hermes-roleplay --previous       # one snapshot back
 ```
 
 The `--card` argument accepts:
