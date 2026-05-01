@@ -19,86 +19,63 @@ Slack, …).
 
 ---
 
-## What it looks like
+## Using it
 
-Your Hermes already speaks on some channel — Telegram, Discord, email,
-whatever. Drop a SillyTavern card (`.png` / `.json` / `.yaml`) into
-that channel and ask Hermes to import it. After `/reset`, Hermes is in
-character on every channel it speaks on, not just the one you dropped
-the file into.
+Hermes is a competent AI agent — it understands intent, downloads
+attachments, runs the right tool. Once HermesTavern is installed,
+the entire UX is conversational. No commands to memorize.
 
-Behind the scenes, the import is just one CLI call:
+In your Hermes chat (Telegram, Discord, QQ, email — any channel
+Hermes already speaks on), upload the card file and say what you want:
 
-```bash
-hermes-tavern import --card aldous.png --home ~/.hermes-roleplay
-cd ~/.hermes-roleplay && HERMES_HOME=~/.hermes-roleplay hermes
-```
+> **you:** _[aldous.png attached]_ install this character
+> **hermes:** Imported "Aldous Huxley". Run `/new` or `/reset` to load.
 
-That writes `SOUL.md` (persona) and `HERMES.md` (lorebook) into
-`HERMES_HOME`; Hermes auto-loads them at session start.
+> **you:** switch to alice
+> **hermes:** Switched to "Alice". Run `/new` or `/reset` to load.
 
-The `cd` matters: `SOUL.md` is read from `HERMES_HOME`, but `HERMES.md`
-is read from **cwd** at hermes startup. HermesTavern prints this
-reminder after every import.
+> **you:** forget all characters, go back to default Hermes
+> **hermes:** Reverted to the pristine snapshot. Run `/new` or `/reset`.
+
+That's the whole surface area. Hermes parses what you mean, calls
+`hermes-tavern` under the hood, prints the next step. Anything
+ambiguous, just clarify in plain language — Hermes handles the rest.
 
 ## Install
 
-You install two pieces:
-
-1. **The CLI** (`hermes-tavern`) — does the parsing / rendering / scanning. Must be on PATH wherever Hermes runs.
-2. **The two skills** (`hermes-tavern`, `hermes-tavern-cards`) — Hermes reads these to learn how to call the CLI.
-
-### Easiest: hand the zip to Hermes
-
-If your Hermes already accepts file drops on some channel (Telegram,
-Discord, email, …), you can install with two file-drops and zero
-terminal-juggling on the Hermes host:
+Two file uploads. No terminal once Hermes is running:
 
 ```bash
-git clone https://github.com/imphillip/hermes-tavern.git && cd hermes-tavern
-zip -r hermes-tavern-skills.zip skills/
+git clone https://github.com/imphillip/hermes-tavern.git
+cd hermes-tavern && zip -r hermes-tavern-skills.zip skills/
 ```
 
-Then in your Hermes chat:
+In your Hermes chat:
 
-1. Drop `hermes-tavern-skills.zip`. Hermes installs both skills.
-   Zip the **whole `skills/` directory**, not individual sub-skills —
-   the `skills/<name>/SKILL.md` layout is what Hermes expects.
-2. Drop the bundled wheel
-   `skills/hermes-tavern/assets/hermes_tavern-0.3.0-py3-none-any.whl`
-   and ask Hermes to pip-install it. (Or have it run
-   `bash skills/hermes-tavern/scripts/install.sh` if pip-install isn't
-   convenient.)
+1. Upload `hermes-tavern-skills.zip` and say **"install this skill"**.
+   Zip the whole `skills/` directory, not individual sub-skills.
+2. Upload `skills/hermes-tavern/assets/hermes_tavern-0.3.0-py3-none-any.whl`
+   and say **"pip-install this for me"**.
 
-That's the daily-use shape: drop the zip once for skills + wheel, then
-drop card files into the chat as you collect them.
+Done. From here on, every interaction is just upload-and-talk as shown
+above.
 
-### Detail: terminal install paths
+### Bootstrap: installing the CLI on the host
 
-For environments without a file-drop gateway, or for first-time CLI
-bootstrap on the host where Hermes runs:
+Only needed when Hermes itself isn't around to do the install for you
+(setting up a fresh Hermes machine, or installing the CLI on a
+different host):
 
-**Hub-style** (when the upstream Hermes hub supports `tap`):
-```bash
-hermes skills tap imphillip/hermes-tavern
-hermes skills install hermes-tavern hermes-tavern-cards
-bash ~/.hermes/skills/hermes-tavern/scripts/install.sh
-```
-
-**Manual checkout**:
 ```bash
 git clone https://github.com/imphillip/hermes-tavern.git && cd hermes-tavern
 bash skills/hermes-tavern/scripts/install.sh
 ```
 
-The bootstrap installer is idempotent — it tries `pipx` → `uv tool` →
-a dedicated venv at `~/.local/share/hermes-tavern-venv` with a shim in
-`~/.local/bin`. Set `HERMES_TAVERN_VENV` / `HERMES_TAVERN_BIN` to
-override paths.
-
-When `hermes-tavern` is published to PyPI, `pipx install hermes-tavern`
-will replace the bundled-wheel bootstrap, and the wheel will be removed
-from the skills' `assets/`.
+Idempotent — tries `pipx` → `uv tool` → a dedicated venv at
+`~/.local/share/hermes-tavern-venv` with a shim in `~/.local/bin`.
+Override with `HERMES_TAVERN_VENV` / `HERMES_TAVERN_BIN`. When
+`hermes-tavern` lands on PyPI, this collapses to
+`pipx install hermes-tavern` and the bundled wheels go away.
 
 ### Requirements
 
