@@ -7,7 +7,7 @@ license: MIT
 metadata:
   hermes:
     tags: [Roleplay, CharacterCard, SillyTavern, SOUL, Persona, TavernAI]
-    homepage: https://github.com/hermes-tavern/hermes-tavern
+    homepage: https://github.com/imphillip/hermes-tavern
     related_skills: [hermes-tavern-cards]
 prerequisites:
   commands: [python]

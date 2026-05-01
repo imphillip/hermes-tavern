@@ -76,7 +76,7 @@ What we deliberately don't do:
 ### Via Hermes hub (recommended)
 
 ```bash
-hermes skills tap <owner>/hermes-tavern
+hermes skills tap imphillip/hermes-tavern
 hermes skills install hermes-tavern hermes-tavern-cards
 
 # One-time CLI bootstrap (the skill bundles a wheel; no PyPI yet)
@@ -90,7 +90,7 @@ needed.
 ### Manual install (from a checked-out repo)
 
 ```bash
-git clone <this-repo> hermes-tavern && cd hermes-tavern
+git clone https://github.com/imphillip/hermes-tavern.git && cd hermes-tavern
 bash skills/hermes-tavern/scripts/install.sh
 ```
 
@@ -102,7 +102,7 @@ override paths.
 ### Engine development (editing the Python package)
 
 ```bash
-git clone <this-repo> hermes-tavern && cd hermes-tavern
+git clone https://github.com/imphillip/hermes-tavern.git && cd hermes-tavern
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 ```
@@ -307,7 +307,7 @@ categories with content are populated.
 ## Development
 
 ```bash
-git clone <this-repo> hermes-tavern && cd hermes-tavern
+git clone https://github.com/imphillip/hermes-tavern.git && cd hermes-tavern
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 
