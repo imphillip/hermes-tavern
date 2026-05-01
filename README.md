@@ -141,6 +141,78 @@ hermes-tavern import ... --distill-cmd "claude -p"
 character name (case-insensitive prefix match against the parsed `name`
 or filename stem).
 
+## Operating modes
+
+HermesTavern picks one of two modes per card based on the rendered
+size. The threshold is 75% of the Hermes 20k slot — i.e. 15,000 chars
+— for **either** SOUL.md or HERMES.md.
+
+### Normal mode (rendered output ≤ 15k per slot)
+
+```
+<HERMES_HOME>/
+├── SOUL.md                          ← rendered persona
+├── HERMES.md                        ← rendered lorebook (only if the
+│                                       card has a character_book)
+└── cards/
+    ├── .active.json                 ← currently active card pointer
+    ├── .trash/                      ← soft-deleted cards (delete/restore)
+    └── <name>_<ts>.<ext>            ← original card backup
+```
+
+### Distillation mode (rendered SOUL or HERMES > 15k)
+
+HermesTavern shells out to your already-configured Hermes CLI (default
+`hermes -q`) for a one-shot LLM compression of the rendered output,
+then lays the **full original** content per-field on disk for runtime
+retrieval by the model.
+
+```
+<HERMES_HOME>/
+├── SOUL.md                          ← LLM-distilled persona (compact)
+├── HERMES.md                        ← distilled lore + extended-file index
+└── cards/
+    ├── .active.json
+    ├── <name>_<ts>.<ext>            ← original card backup
+    └── <name>_<ts>/
+        └── extended/                ← full original content, per-field
+            ├── description.md
+            ├── personality.md
+            ├── scenario.md
+            ├── first_mes.md
+            ├── mes_example.md
+            ├── system_prompt.md
+            ├── post_history_instructions.md
+            ├── alternate_greetings/01.md, 02.md, ...
+            └── lore/<entry-slug>.md
+```
+
+The model reads SOUL.md and HERMES.md statically at session start, then
+opens specific `extended/...md` files only when the conversation calls
+for those details — that's why `cd $HERMES_HOME` matters even more
+here (HERMES.md is the index that points at the per-field files).
+
+Opt out of distillation with `--no-distill` (surfaces the original
+budget error). Override the distillation command with
+`--distill-cmd "<command>"`. Full pipeline lives in
+[`hermes-tavern/references/distillation.md`](hermes-tavern/references/distillation.md).
+
+## Files HermesTavern writes — and never writes
+
+**Writes (only inside `<HERMES_HOME>`):** the layout above. That's the
+entire blast radius.
+
+**Never writes:**
+
+- `AGENTS.md` — shadowed by HERMES.md per Hermes's loader priority.
+- `MEMORY.md`, `USER.md` — owned by the running agent's memory tool.
+- `CLAUDE.md`, `.cursorrules` — other tools' territory.
+- Any file outside `<HERMES_HOME>` at runtime.
+- Any Hermes config / channel allowlist / `platform_toolsets` entry.
+
+To clean a `HERMES_HOME` completely: `rm -rf <home>/{SOUL.md,HERMES.md,cards}` —
+nothing leaks elsewhere.
+
 ## Documentation
 
 The two skills are self-documenting; their `SKILL.md` and
