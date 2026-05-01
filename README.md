@@ -317,6 +317,27 @@ categories with content are populated.
   Edits to `SOUL.md` / `HERMES.md` take effect on the next session or
   after `/reset` inside hermes.
 
+## Known issues
+
+- **Some IM clients re-encode PNG attachments on upload, destroying
+  the embedded card data.** SillyTavern V2 cards keep the actual
+  payload inside a PNG `tEXt` chunk; when an IM rewrites the image
+  (resizing, stripping metadata, converting to a JPEG thumbnail, …),
+  the chunk is gone and HermesTavern can't parse the file.
+  **Workaround:** zip the PNG before uploading
+  (`zip aldous.zip aldous.png`) so the IM treats it as an opaque
+  binary blob and leaves the bytes untouched. Hermes can unzip and
+  import from there.
+- **Distillation of oversized cards can stall on safety-restricted
+  models.** When a card overflows the 15k threshold HermesTavern
+  shells out to `hermes -q` for an LLM compression pass. If the card
+  carries adult or otherwise content-policy-touching material and
+  the underlying model is heavily moderated, the call can take
+  noticeably longer (retries, slow streaming, hard refusals) —
+  sometimes long enough to look frozen. There's no clean fix on the
+  HermesTavern side: point Hermes at a less restrictive model for
+  these cards.
+
 ## Development
 
 ```bash

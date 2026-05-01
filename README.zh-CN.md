@@ -295,6 +295,21 @@ hermes-tavern/
 - **不支持热编辑。** Hermes 在会话开始时缓存 system prompt，对 `SOUL.md` /
   `HERMES.md` 的修改要等下次会话或在 hermes 里 `/reset` 之后才生效。
 
+## 已知问题
+
+- **某些 IM 上传 PNG 时会重新编码图片，破坏角色卡数据。**
+  SillyTavern V2 卡把真正的角色数据藏在 PNG 的 `tEXt` chunk 里；
+  当 IM 重写图片（缩放、剥元数据、转成 JPEG 缩略图等等）时，那个 chunk
+  就没了，HermesTavern 也就解不出来。**解决办法：** 上传前把 PNG 打成 zip
+  （`zip aldous.zip aldous.png`），让 IM 当二进制 blob 来传，原始字节就
+  不会动。Hermes 拿到 zip 之后解压再导入就行。
+- **超大卡的蒸馏在内容审查严的模型上可能卡很久。**
+  当一张卡超过 15k 阈值，HermesTavern 会 shell out 到 `hermes -q` 做 LLM
+  压缩。如果卡里有成人内容或其他踩内容政策的素材，而底下的 LLM 审查严，
+  这次调用就可能明显变慢（重试、流式吐字慢、硬拒绝），慢到让人以为卡死了。
+  HermesTavern 这边没有干净的修法：给这类卡换一个限制宽松点的模型。
+  懂的都懂。
+
 ## 开发
 
 ```bash
