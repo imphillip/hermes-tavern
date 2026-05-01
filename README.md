@@ -73,18 +73,33 @@ What we deliberately don't do:
 
 ## Install
 
-`hermes-tavern` is **not yet published to PyPI**. The CLI ships as a
-wheel bundled inside each skill's `assets/` and is installed via the
-skill's `scripts/install.sh`:
+### Via Hermes hub (recommended)
 
 ```bash
-# Install from a checked-out skill folder:
-bash hermes-tavern/scripts/install.sh
-# (Idempotent. The installer tries pipx → uv tool → dedicated venv +
-# shim. Set HERMES_TAVERN_VENV / HERMES_TAVERN_BIN to override paths.)
+hermes skills tap <owner>/hermes-tavern
+hermes skills install hermes-tavern hermes-tavern-cards
+
+# One-time CLI bootstrap (the skill bundles a wheel; no PyPI yet)
+bash ~/.hermes/skills/hermes-tavern/scripts/install.sh
 ```
 
-For local development of the engine itself:
+The skills follow the standard `<repo>/skills/<name>/` layout that
+`openai/skills` and `anthropics/skills` use, so no `--path` flag is
+needed.
+
+### Manual install (from a checked-out repo)
+
+```bash
+git clone <this-repo> hermes-tavern && cd hermes-tavern
+bash skills/hermes-tavern/scripts/install.sh
+```
+
+The installer is idempotent — it tries `pipx` → `uv tool` → a
+dedicated venv at `~/.local/share/hermes-tavern-venv` with a shim in
+`~/.local/bin`. Set `HERMES_TAVERN_VENV` / `HERMES_TAVERN_BIN` to
+override paths.
+
+### Engine development (editing the Python package)
 
 ```bash
 git clone <this-repo> hermes-tavern && cd hermes-tavern
@@ -92,9 +107,9 @@ python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 ```
 
-When publishing to PyPI lands, `pipx install hermes-tavern` will be the
-preferred path; the bundled-wheel approach will remain as a fallback for
-air-gapped installs.
+When `hermes-tavern` is published to PyPI, `pipx install hermes-tavern`
+will be the preferred CLI path and the bundled wheel will be removed
+from the skills' `assets/`.
 
 ## Quick start
 
@@ -206,7 +221,7 @@ here (HERMES.md is the index that points at the per-field files).
 Opt out of distillation with `--no-distill` (surfaces the original
 budget error). Override the distillation command with
 `--distill-cmd "<command>"`. Full pipeline lives in
-[`hermes-tavern/references/distillation.md`](hermes-tavern/references/distillation.md).
+[`skills/hermes-tavern/references/distillation.md`](skills/hermes-tavern/references/distillation.md).
 
 ## Files HermesTavern writes — and never writes
 
@@ -231,43 +246,48 @@ The two skills are self-documenting; their `SKILL.md` and
 
 **Skills**
 
-- [`hermes-tavern/SKILL.md`](hermes-tavern/SKILL.md) —
+- [`skills/hermes-tavern/SKILL.md`](skills/hermes-tavern/SKILL.md) —
   import & validate
-- [`hermes-tavern-cards/SKILL.md`](hermes-tavern-cards/SKILL.md) —
+- [`skills/hermes-tavern-cards/SKILL.md`](skills/hermes-tavern-cards/SKILL.md) —
   list / current / switch / delete / restore
 
 **Reference docs (loader skill)**
 
-- [`v2-spec-summary.md`](hermes-tavern/references/v2-spec-summary.md) — V2 card field cheat sheet
-- [`field-mapping.md`](hermes-tavern/references/field-mapping.md) — exact V2 → markdown rules
-- [`usage-recipes.md`](hermes-tavern/references/usage-recipes.md) — common workflows and gotchas
-- [`security.md`](hermes-tavern/references/security.md) — threat model + sanitiser layers
-- [`distillation.md`](hermes-tavern/references/distillation.md) — oversized-card pipeline
+- [`v2-spec-summary.md`](skills/hermes-tavern/references/v2-spec-summary.md) — V2 card field cheat sheet
+- [`field-mapping.md`](skills/hermes-tavern/references/field-mapping.md) — exact V2 → markdown rules
+- [`usage-recipes.md`](skills/hermes-tavern/references/usage-recipes.md) — common workflows and gotchas
+- [`security.md`](skills/hermes-tavern/references/security.md) — threat model + sanitiser layers
+- [`distillation.md`](skills/hermes-tavern/references/distillation.md) — oversized-card pipeline
 
 **Reference docs (cards skill)**
 
-- [`library-layout.md`](hermes-tavern-cards/references/library-layout.md) — `<HERMES_HOME>/cards/` schema, `--card` resolution
+- [`library-layout.md`](skills/hermes-tavern-cards/references/library-layout.md) — `<HERMES_HOME>/cards/` schema, `--card` resolution
 
 ## Repository layout
 
 ```
 hermes-tavern/
-├── src/hermes_tavern/         Python package (the engine; pip-installable)
-├── tests/                     pytest suite (incl. real-card smoke)
-├── examples/                  local third-party cards (gitignored)
-├── hermes-tavern/             Skill 1: import & validate
-│   ├── SKILL.md
-│   ├── references/            5 reference docs
-│   ├── scripts/               skill entry wrappers
-│   └── assets/aldous_v2.json  sample V2 card
-└── hermes-tavern-cards/       Skill 2: library management
-    ├── SKILL.md
-    ├── references/            library-layout doc
-    └── scripts/               skill entry wrappers
+├── src/hermes_tavern/             Python package (the engine; pip-installable)
+├── tests/                         pytest suite (incl. real-card smoke)
+├── examples/                      local third-party cards (gitignored)
+└── skills/                        Hermes-hub-discoverable skills tree
+    ├── hermes-tavern/             Skill 1: import & validate
+    │   ├── SKILL.md
+    │   ├── references/            5 reference docs
+    │   ├── scripts/               skill entry wrappers + install.sh
+    │   └── assets/                bundled wheel + sample V2 card
+    └── hermes-tavern-cards/       Skill 2: library management
+        ├── SKILL.md
+        ├── references/            library-layout doc
+        ├── scripts/               skill entry wrappers + install.sh
+        └── assets/                bundled wheel
 ```
 
-Each skill folder uses the standard `references/` / `scripts/` /
-`assets/` layout — only categories with content are populated.
+The `skills/` subdirectory matches the `path: "skills/"` convention
+used by `openai/skills` and `anthropics/skills`, so `hermes skills tap`
+discovers both skills with no configuration. Each skill folder uses
+the standard `references/` / `scripts/` / `assets/` layout — only
+categories with content are populated.
 
 ## Limitations
 
@@ -321,7 +341,7 @@ PRs welcome. Before opening one:
 1. Add or update tests under `tests/` for whatever you change.
 2. Run `pytest` and confirm it stays green.
 3. If you change the card → markdown contract, update
-   `hermes-tavern/references/field-mapping.md` so the spec
+   `skills/hermes-tavern/references/field-mapping.md` so the spec
    matches the code.
 4. If you add a new CLI flag, mention it in the relevant `SKILL.md`
    and the README's "Common workflows" block.

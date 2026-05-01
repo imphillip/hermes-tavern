@@ -1,7 +1,7 @@
 ---
 name: hermes-tavern
 description: "Import a SillyTavern V2 character card (.png/.json/.yaml) into Hermes-Agent as SOUL.md + HERMES.md. Channel-agnostic — affects every gateway."
-version: 0.1.0
+version: 0.3.0
 author: HermesTavern contributors
 license: MIT
 metadata:
@@ -10,7 +10,7 @@ metadata:
     homepage: https://github.com/hermes-tavern/hermes-tavern
     related_skills: [hermes-tavern-cards]
 prerequisites:
-  commands: [python, hermes-tavern]
+  commands: [python]
   python:
     version: ">=3.10"
     packages: [pillow, pyyaml, jinja2]
