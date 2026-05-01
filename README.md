@@ -1,5 +1,7 @@
 # HermesTavern
 
+[English](README.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
+
 > Run your SillyTavern characters in a Hermes agent.
 
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
