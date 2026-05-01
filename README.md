@@ -28,52 +28,42 @@ the entire UX is conversational. No commands to memorize.
 In your Hermes chat (Telegram, Discord, QQ, email — any channel
 Hermes already speaks on), upload the card file and say what you want:
 
-> **you:** _[aldous.png attached]_ install this character
-> **hermes:** Imported "Aldous Huxley". Run `/new` or `/reset` to load.
+> _[aldous.png attached]_ install this character
 
-> **you:** switch to alice
-> **hermes:** Switched to "Alice". Run `/new` or `/reset` to load.
+> switch to alice
 
-> **you:** forget all characters, go back to default Hermes
-> **hermes:** Reverted to the pristine snapshot. Run `/new` or `/reset`.
+> forget all characters, go back to default Hermes
 
 That's the whole surface area. Hermes parses what you mean, calls
-`hermes-tavern` under the hood, prints the next step. Anything
-ambiguous, just clarify in plain language — Hermes handles the rest.
+`hermes-tavern` under the hood, and tells you to run `/new` or
+`/reset` when the change is ready to load. Anything ambiguous, just
+clarify in plain language — Hermes handles the rest.
 
 ## Install
 
-Two file uploads. No terminal once Hermes is running:
+One file upload. No terminal once Hermes is running:
 
 ```bash
 git clone https://github.com/imphillip/hermes-tavern.git
 cd hermes-tavern && zip -r hermes-tavern-skills.zip skills/
 ```
 
-In your Hermes chat:
+In your Hermes chat, upload `hermes-tavern-skills.zip` and say
+**"install this skill"**. Zip the whole `skills/` directory, not
+individual sub-skills — Hermes expects the `skills/<name>/SKILL.md`
+layout and uses the bundled wheel under
+`skills/hermes-tavern/assets/` to put the `hermes-tavern` CLI on PATH.
 
-1. Upload `hermes-tavern-skills.zip` and say **"install this skill"**.
-   Zip the whole `skills/` directory, not individual sub-skills.
-2. Upload `skills/hermes-tavern/assets/hermes_tavern-0.3.0-py3-none-any.whl`
-   and say **"pip-install this for me"**.
-
-Done. From here on, every interaction is just upload-and-talk as shown
-above.
+From here on, every interaction is just upload-and-talk as shown above.
 
 ### Or via Hermes hub
 
-If your Hermes is set up with the hub `tap` system, registering this
-repo and installing both skills is two commands:
+If your Hermes is set up with the hub `tap` system:
 
 ```bash
 hermes skills tap add imphillip/hermes-tavern
 hermes skills install hermes-tavern hermes-tavern-cards
 ```
-
-You still need to bootstrap the `hermes-tavern` CLI itself once —
-either by uploading the bundled wheel and asking Hermes to pip-install
-it (same as step 2 above), or by running the bootstrap script from
-the next section.
 
 ### Bootstrap: installing the CLI on the host
 
