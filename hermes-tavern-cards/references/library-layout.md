@@ -1,0 +1,106 @@
+# `<HERMES_HOME>/cards/` library layout
+
+The cards manager skill operates entirely on this directory. It is created
+the first time `hermes-tavern import` runs.
+
+**Normal mode** (rendered output ≤ 15k per slot):
+
+```
+<HERMES_HOME>/
+├── SOUL.md                        # rendered persona (active character)
+├── HERMES.md                      # rendered lorebook (optional)
+└── cards/
+    ├── .active.json               # pointer to currently active card
+    ├── .trash/                    # soft-deleted card payloads
+    │   └── <name>_<ts>.<ext>
+    ├── <name>_<ts>.json           # imported card backups
+    ├── <name>_<ts>.png
+    └── <name>_<ts>.yaml
+```
+
+**Distillation mode** (triggered when rendered SOUL or HERMES > 15k):
+
+```
+<HERMES_HOME>/
+├── SOUL.md                        # LLM-distilled persona (compact)
+├── HERMES.md                      # distilled lore + extended-file index
+└── cards/
+    ├── .active.json
+    ├── <name>_<ts>.<ext>          # original card backup
+    └── <name>_<ts>/
+        └── extended/              # full original per-field content
+            ├── description.md
+            ├── alternate_greetings/01.md ...
+            ├── mes_example.md
+            └── lore/<entry>.md
+```
+
+`AGENTS.md` is intentionally never written — Hermes loads it only when
+HERMES.md is absent, so the references would never reach the model.
+Distillation mode merges the index into `HERMES.md`. See
+`../hermes-tavern/references/distillation.md` for the full rationale.
+
+## Launch posture
+
+`HERMES.md` is read relative to **cwd** at hermes startup, not
+`HERMES_HOME`. Users must `cd $HERMES_HOME` before running `hermes` or
+the lorebook / extended-file index won't be loaded. `SOUL.md` is the
+exception — it's anchored to `HERMES_HOME` regardless of cwd.
+
+## `.active.json`
+
+```json
+{
+  "name": "Aldous",
+  "card_file": "Aldous_20260501T120000.png",
+  "imported_at": "2026-05-01T12:00:00+00:00",
+  "user_noun": "the visitor",
+  "soul_only": false,
+  "has_hermes_md": true
+}
+```
+
+- `name` — `data.name` from the card at import time.
+- `card_file` — basename inside `cards/` (no path).
+- `imported_at` — ISO-8601 UTC timestamp of the *most recent* activation
+  (import or switch).
+- `user_noun` — the `--user-noun` value used when rendering. `switch`
+  reuses this unless `--user-noun` is passed explicitly.
+- `soul_only` — whether `--soul-only` was used. Same reuse rule on
+  `switch`.
+- `has_hermes_md` — whether HERMES.md was actually written this round.
+
+The file is overwritten by every `import` and every `switch`. It is
+removed by `delete` when the deleted card was active.
+
+## `.trash/`
+
+`hermes-tavern delete` moves the card payload into `.trash/`, preserving
+the filename. `restore` moves it back. Nothing in `.trash/` is ever
+unlinked by HermesTavern; permanent deletion is a host-shell operation.
+
+If a deleted card was active, `SOUL.md` and `HERMES.md` are left in
+place — only the `.active.json` pointer is cleared. To wipe the persona
+entirely, switch to another card or remove the rendered files manually.
+
+## Card filenames
+
+Filenames follow `{safe_name}_{YYYYMMDDTHHMMSS}{suffix}` where
+`{safe_name}` is `data.name` with anything outside
+`[A-Za-z0-9_.-]` collapsed to `_`. Collisions are rare because of the
+timestamp; if one occurs (same name imported twice in the same second),
+the second import overwrites the first inside `cards/` but the active
+pointer still tracks it correctly.
+
+## `--card` query resolution
+
+For `switch` / `delete` / `restore`, the `--card` argument is matched in
+this order:
+
+1. Exact filename in `cards/` (or `cards/.trash/` for `restore`).
+2. Case-insensitive equality with the filename stem.
+3. Case-insensitive equality with the parsed `data.name`.
+4. Case-insensitive prefix match against either of (2) or (3).
+
+If multiple cards match at step (4), the command refuses and lists the
+candidates. Disambiguate by passing the full filename.

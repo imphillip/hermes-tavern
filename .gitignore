@@ -1,0 +1,26 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+dist/
+build/
+# The wheels under each skill's assets/ ARE checked in (see install.sh
+# bootstrap path); only the top-level dist/ from `python -m build` is ignored.
+.venv/
+venv/
+.env
+.DS_Store
+
+# Claude Code local settings (per-machine)
+.claude/
+
+# Real third-party cards used for local validation only. Don't commit:
+# license / size / content all unclear. Drop your own cards under
+# examples/.local/ and run scripts/smoke-real-cards.sh against them.
+examples/.local/
+examples/main_*
