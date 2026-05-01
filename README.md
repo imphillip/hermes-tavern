@@ -60,6 +60,21 @@ In your Hermes chat:
 Done. From here on, every interaction is just upload-and-talk as shown
 above.
 
+### Or via Hermes hub
+
+If your Hermes is set up with the hub `tap` system, registering this
+repo and installing both skills is two commands:
+
+```bash
+hermes skills tap add imphillip/hermes-tavern
+hermes skills install hermes-tavern hermes-tavern-cards
+```
+
+You still need to bootstrap the `hermes-tavern` CLI itself once —
+either by uploading the bundled wheel and asking Hermes to pip-install
+it (same as step 2 above), or by running the bootstrap script from
+the next section.
+
 ### Bootstrap: installing the CLI on the host
 
 Only needed when Hermes itself isn't around to do the install for you
@@ -289,9 +304,10 @@ hermes-tavern/
 ```
 
 The `skills/` subdirectory matches the `path: "skills/"` convention
-used by `openai/skills` and `anthropics/skills`, so `hermes skills tap`
-discovers both skills with no configuration. Each skill folder uses
-the standard `references/` / `scripts/` / `assets/` layout — only
+used by `openai/skills` and `anthropics/skills`, so
+`hermes skills tap add imphillip/hermes-tavern` works without any
+extra configuration. Each skill folder uses the standard
+`references/` / `scripts/` / `assets/` layout — only
 categories with content are populated.
 
 ## Limitations
