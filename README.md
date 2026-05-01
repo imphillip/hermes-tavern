@@ -19,6 +19,97 @@ Slack, …).
 
 ---
 
+## What it looks like
+
+Your Hermes already speaks on some channel — Telegram, Discord, email,
+whatever. Drop a SillyTavern card (`.png` / `.json` / `.yaml`) into
+that channel and ask Hermes to import it. After `/reset`, Hermes is in
+character on every channel it speaks on, not just the one you dropped
+the file into.
+
+Behind the scenes, the import is just one CLI call:
+
+```bash
+hermes-tavern import --card aldous.png --home ~/.hermes-roleplay
+cd ~/.hermes-roleplay && HERMES_HOME=~/.hermes-roleplay hermes
+```
+
+That writes `SOUL.md` (persona) and `HERMES.md` (lorebook) into
+`HERMES_HOME`; Hermes auto-loads them at session start.
+
+The `cd` matters: `SOUL.md` is read from `HERMES_HOME`, but `HERMES.md`
+is read from **cwd** at hermes startup. HermesTavern prints this
+reminder after every import.
+
+## Install
+
+You install two pieces:
+
+1. **The CLI** (`hermes-tavern`) — does the parsing / rendering / scanning. Must be on PATH wherever Hermes runs.
+2. **The two skills** (`hermes-tavern`, `hermes-tavern-cards`) — Hermes reads these to learn how to call the CLI.
+
+### Easiest: hand the zip to Hermes
+
+If your Hermes already accepts file drops on some channel (Telegram,
+Discord, email, …), you can install with two file-drops and zero
+terminal-juggling on the Hermes host:
+
+```bash
+git clone https://github.com/imphillip/hermes-tavern.git && cd hermes-tavern
+zip -r hermes-tavern-skills.zip skills/
+```
+
+Then in your Hermes chat:
+
+1. Drop `hermes-tavern-skills.zip`. Hermes installs both skills.
+   Zip the **whole `skills/` directory**, not individual sub-skills —
+   the `skills/<name>/SKILL.md` layout is what Hermes expects.
+2. Drop the bundled wheel
+   `skills/hermes-tavern/assets/hermes_tavern-0.3.0-py3-none-any.whl`
+   and ask Hermes to pip-install it. (Or have it run
+   `bash skills/hermes-tavern/scripts/install.sh` if pip-install isn't
+   convenient.)
+
+That's the daily-use shape: drop the zip once for skills + wheel, then
+drop card files into the chat as you collect them.
+
+### Detail: terminal install paths
+
+For environments without a file-drop gateway, or for first-time CLI
+bootstrap on the host where Hermes runs:
+
+**Hub-style** (when the upstream Hermes hub supports `tap`):
+```bash
+hermes skills tap imphillip/hermes-tavern
+hermes skills install hermes-tavern hermes-tavern-cards
+bash ~/.hermes/skills/hermes-tavern/scripts/install.sh
+```
+
+**Manual checkout**:
+```bash
+git clone https://github.com/imphillip/hermes-tavern.git && cd hermes-tavern
+bash skills/hermes-tavern/scripts/install.sh
+```
+
+The bootstrap installer is idempotent — it tries `pipx` → `uv tool` →
+a dedicated venv at `~/.local/share/hermes-tavern-venv` with a shim in
+`~/.local/bin`. Set `HERMES_TAVERN_VENV` / `HERMES_TAVERN_BIN` to
+override paths.
+
+When `hermes-tavern` is published to PyPI, `pipx install hermes-tavern`
+will replace the bundled-wheel bootstrap, and the wheel will be removed
+from the skills' `assets/`.
+
+### Requirements
+
+- Python ≥ 3.10
+- A working [`hermes`](https://github.com/NousResearch/hermes-agent) CLI
+  if you want distillation for oversized cards (default
+  `--distill-cmd "hermes -q"`; override with `--distill-cmd` or skip
+  with `--no-distill`)
+
+---
+
 ## Why
 
 Hermes already auto-loads `SOUL.md` (independent identity slot) and
@@ -62,69 +153,6 @@ What we deliberately don't do:
   `--previous` / `--to <id|name>` walks the history
 - **Channel-agnostic** — produces the persona files Hermes loads at
   startup; everything Hermes can talk on is automatically in character
-
-## Requirements
-
-- Python ≥ 3.10
-- A working [`hermes`](https://github.com/NousResearch/hermes-agent) CLI
-  if you want distillation for oversized cards (default
-  `--distill-cmd "hermes -q"`; override with `--distill-cmd` or skip
-  with `--no-distill`)
-
-## Install
-
-### Via Hermes hub (recommended)
-
-```bash
-hermes skills tap imphillip/hermes-tavern
-hermes skills install hermes-tavern hermes-tavern-cards
-
-# One-time CLI bootstrap (the skill bundles a wheel; no PyPI yet)
-bash ~/.hermes/skills/hermes-tavern/scripts/install.sh
-```
-
-The skills follow the standard `<repo>/skills/<name>/` layout that
-`openai/skills` and `anthropics/skills` use, so no `--path` flag is
-needed.
-
-### Manual install (from a checked-out repo)
-
-```bash
-git clone https://github.com/imphillip/hermes-tavern.git && cd hermes-tavern
-bash skills/hermes-tavern/scripts/install.sh
-```
-
-The installer is idempotent — it tries `pipx` → `uv tool` → a
-dedicated venv at `~/.local/share/hermes-tavern-venv` with a shim in
-`~/.local/bin`. Set `HERMES_TAVERN_VENV` / `HERMES_TAVERN_BIN` to
-override paths.
-
-### Engine development (editing the Python package)
-
-```bash
-git clone https://github.com/imphillip/hermes-tavern.git && cd hermes-tavern
-python -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"
-```
-
-When `hermes-tavern` is published to PyPI, `pipx install hermes-tavern`
-will be the preferred CLI path and the bundled wheel will be removed
-from the skills' `assets/`.
-
-## Quick start
-
-```bash
-# 1. import a card
-hermes-tavern import --card aldous.png --home ~/.hermes-roleplay
-
-# 2. launch hermes from inside HERMES_HOME
-cd ~/.hermes-roleplay && HERMES_HOME=~/.hermes-roleplay hermes
-```
-
-The `cd` matters. `SOUL.md` is read from `HERMES_HOME`, but `HERMES.md`
-is read from **cwd** at hermes startup. Launching hermes from anywhere
-else loads the persona but not the world / lorebook / extended-file
-index. HermesTavern prints this reminder after every import.
 
 ## Common workflows
 
