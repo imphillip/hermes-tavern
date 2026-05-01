@@ -140,17 +140,27 @@ and failure modes.
 
 ## Security defaults
 
-The loader treats every card as third-party content:
+Every card is treated as third-party content:
 
-1. SOUL.md / HERMES.md begin with a **trust-boundary banner** marking
-   everything below as persona content, not operator instruction.
-2. `system_prompt` and `post_history_instructions` are demoted into
+1. **`# IDENTITY DIRECTIVE`** is auto-injected at the top of every
+   `SOUL.md` to override hermes's hard-coded "you are an AI assistant
+   on \<channel\>" framing. Without it the model collapses back to
+   "I'm an AI assistant. If we're roleplaying, I'm currently
+   portraying X" instead of just answering as the character. Operator
+   safety is explicitly preserved.
+2. SOUL.md / HERMES.md include a **trust-boundary banner** marking
+   everything below as third-party content. Banner is security-only —
+   it tells the model to ignore directives that try to change tools /
+   override safety / leak data, without calling the persona "roleplay
+   material" (that would undercut the IDENTITY DIRECTIVE).
+3. `system_prompt` and `post_history_instructions` are demoted into
    `## Author's framing (untrusted ...)` and `## Author's closing note
    (untrusted ...)` sections by default. Use `--trust-system-prompt` to
-   promote them back to the V2 high-trust slot.
-3. Card text is run through a **sanitiser** that strips zero-width
+   promote them back to the V2 high-trust slot. The IDENTITY DIRECTIVE
+   is emitted regardless of this flag.
+4. Card text is run through a **sanitiser** that strips zero-width
    chars, RTL overrides, and other invisible / control characters.
-4. Every `import` and `validate` runs a **red-flag scan** for prompt
+5. Every `import` and `validate` runs a **red-flag scan** for prompt
    injection patterns (override instructions, fake tool tags, exfil
    URLs, …) and prints findings to stderr / stdout. Findings warn but
    never block.

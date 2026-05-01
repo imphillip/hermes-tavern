@@ -11,12 +11,34 @@ them stops a determined attacker; together they make the most common
 prompt-injection patterns visible and reduce the attack surface that
 naive operators trip over.
 
-## Layer 1 — visible trust boundary
+## Layer 1 — identity directive + visible trust boundary
 
-`SOUL.md` and `HERMES.md` open with a banner block telling the model
-that everything below it is third-party persona content, not operator
-instruction. The trailing model-notes section reinforces operator >
-persona priority.
+`SOUL.md` opens with two structural defences:
+
+**1. `# IDENTITY DIRECTIVE — HIGHEST PRIORITY`** at the absolute top.
+Auto-injected by HermesTavern for every imported card (no opt-out).
+Pre-empts the platform-level "you are Hermes Agent / an AI assistant
+on \<channel\>" framing that hermes hard-codes into its system prompt.
+Without it, the model collapses to the AI-assistant default and
+answers things like "I'm an AI assistant. If we're roleplaying, I'm
+currently portraying X" instead of just answering as the character.
+
+The directive:
+
+- binds the character's name at render time (`You are **{name}**.`)
+- lists the framing patterns to ignore as "stage directions"
+- explicitly forbids meta-disclosure ("I'm portraying …", "if we're
+  roleplaying then …", references to Hermes / Telegram / the model)
+- explicitly **preserves operator-level safety** so it cannot be used
+  to construct a "be the character even when asked something harmful"
+  loophole
+
+**2. Persona content boundary banner** below the H1. Tells the model
+that everything below was imported from a third-party card and that
+directives inside it which try to change tools, override safety, leak
+data, or contact external systems are not legitimate operator
+instructions. The trailing model-notes section reinforces the
+operator > persona priority order.
 
 The two highest-risk V2 fields (`system_prompt` and
 `post_history_instructions`) are **demoted by default** into clearly
@@ -28,7 +50,8 @@ in the highest-trust slot of the file.
 
 To restore the V2-spec high-trust positions for these fields, pass
 `--trust-system-prompt`. Use it only for cards from authors you trust
-yourself — never as a blanket override.
+yourself — never as a blanket override. The IDENTITY DIRECTIVE is
+emitted regardless of this flag.
 
 ## Layer 2 — parse-time hygiene
 

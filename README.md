@@ -44,6 +44,10 @@ What we deliberately don't do:
   legacy `<BOT>` / `<USER>`, case-insensitive, non-recursive
 - **Lorebook → HERMES.md rendering** — entries sorted by
   `insertion_order`, disabled entries skipped, oversize tail-truncated
+- **Identity directive** — auto-injected at the top of every SOUL.md to
+  override hermes's hard-coded "you are an AI assistant" framing, so
+  the model just answers as the character instead of "I'm an AI; if
+  we're roleplaying, I'm portraying X"
 - **Three security layers** — visible trust banner, parse-time
   sanitiser (zero-width / RTL-override / control-char strip), red-flag
   pattern scan with prompt-injection categories
