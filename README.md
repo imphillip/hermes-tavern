@@ -267,7 +267,7 @@ The two skills are self-documenting; their `SKILL.md` and
 
 ```
 hermes-tavern/
-├── src/hermes_tavern/             Python package (the engine; pip-installable)
+├── src/hermes_tavern/             Python package (the engine; bundled wheel until PyPI)
 ├── tests/                         pytest suite (incl. real-card smoke)
 ├── examples/                      local third-party cards (gitignored)
 └── skills/                        Hermes-hub-discoverable skills tree
@@ -325,14 +325,6 @@ The `tests/` suite covers parse, render, substitute, sanitize, scan,
 extended, distill (mocked LLM), library, CLI, and end-to-end pipeline.
 Aim for green; unmocked subprocess tests use a small fake `hermes`
 shell script written into a tempdir.
-
-## Roadmap
-
-- [ ] PNG export — write back into a card after editing the markdown
-- [ ] Distilled-output cache so switching back to a previously-distilled card doesn't re-spend an LLM call
-- [ ] Web UI for live preview
-- [ ] Batch import a card library
-- [ ] `revert` / `undo` to roll back to the previously-active card
 
 ## Contributing
 
