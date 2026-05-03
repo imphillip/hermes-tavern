@@ -288,11 +288,10 @@ hermes-tavern/
     │   ├── references/            5 reference docs
     │   ├── scripts/               skill entry wrappers + install.sh
     │   └── assets/                bundled wheel + sample V2 card
-    └── hermes-tavern-cards/       Skill 2: library management
+    └── hermes-tavern-cards/       Skill 2: library management (depends on hermes-tavern)
         ├── SKILL.md
         ├── references/            library-layout doc
-        ├── scripts/               skill entry wrappers + install.sh
-        └── assets/                bundled wheel
+        └── scripts/               skill entry wrappers
 ```
 
 The `skills/` subdirectory matches the `path: "skills/"` convention

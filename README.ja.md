@@ -286,11 +286,10 @@ hermes-tavern/
     │   ├── references/            5 件の参考文書
     │   ├── scripts/               skill エントリーラッパー + install.sh
     │   └── assets/                同梱 wheel + サンプル V2 カード
-    └── hermes-tavern-cards/       Skill 2: ライブラリ管理
+    └── hermes-tavern-cards/       Skill 2: ライブラリ管理(hermes-tavern 依存)
         ├── SKILL.md
         ├── references/            library-layout 文書
-        ├── scripts/               skill エントリーラッパー + install.sh
-        └── assets/                同梱 wheel
+        └── scripts/               skill エントリーラッパー
 ```
 
 `skills/` サブディレクトリは `openai/skills` および `anthropics/skills` で

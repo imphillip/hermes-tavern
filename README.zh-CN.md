@@ -271,11 +271,10 @@ hermes-tavern/
     │   ├── references/            5 份参考文档
     │   ├── scripts/               skill 入口 wrapper + install.sh
     │   └── assets/                捆绑 wheel + 示例 V2 卡
-    └── hermes-tavern-cards/       Skill 2: 卡库管理
+    └── hermes-tavern-cards/       Skill 2: 卡库管理(依赖 hermes-tavern)
         ├── SKILL.md
         ├── references/            library-layout 文档
-        ├── scripts/               skill 入口 wrapper + install.sh
-        └── assets/                捆绑 wheel
+        └── scripts/               skill 入口 wrapper
 ```
 
 `skills/` 子目录沿用 `openai/skills` 和 `anthropics/skills` 的

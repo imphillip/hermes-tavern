@@ -15,11 +15,9 @@
 set -euo pipefail
 
 if ! command -v hermes-tavern >/dev/null 2>&1; then
-    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     echo "manage_cards.sh: hermes-tavern CLI not on PATH." >&2
-    echo "manage_cards.sh: run the bundled installer once to set it up:" >&2
-    echo "    bash $SCRIPT_DIR/install.sh" >&2
-    echo "manage_cards.sh: (the installer tries pipx → uv tool → dedicated venv.)" >&2
+    echo "manage_cards.sh: install the sibling 'hermes-tavern' skill first" >&2
+    echo "manage_cards.sh: — it ships the CLI bootstrap (scripts/install.sh)." >&2
     exit 127
 fi
 

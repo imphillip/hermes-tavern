@@ -10,6 +10,7 @@ metadata:
     homepage: https://github.com/imphillip/hermes-tavern
     related_skills: [hermes-tavern]
 prerequisites:
+  skills: [hermes-tavern]
   commands: [python]
   python:
     version: ">=3.10"
@@ -55,22 +56,12 @@ default, so users can `restore` if they change their mind.
 
 ## Prerequisites
 
-- Python 3.10+
-- The `hermes-tavern` CLI on PATH — run `bash scripts/install.sh` once
-  (see Install below; or skip if the sibling `hermes-tavern` skill has
-  already installed it on this machine)
+- The sibling **`hermes-tavern`** skill must be installed first — it
+  ships the `hermes-tavern` CLI that this skill drives. Once that
+  skill is in place, no extra setup is needed here.
 - A `HERMES_HOME` that already has at least one card imported via
-  `hermes-tavern import` (the sibling loader skill)
-
-## Install
-
-```bash
-bash scripts/install.sh
-```
-
-Idempotent — exits early if the CLI is already on PATH. The installer
-is identical to the one in the sibling `hermes-tavern` skill; running
-it from either skill installs the same CLI for both.
+  `hermes-tavern import` (i.e. the loader skill has been used at
+  least once).
 
 ## Quick start
 
