@@ -43,20 +43,33 @@ clarify in plain language — Hermes handles the rest.
 
 ## Install
 
-One file upload. No terminal once Hermes is running:
+**Easiest** — download the pre-built zip from the
+[latest Release](https://github.com/imphillip/hermes-tavern/releases/latest):
+
+```bash
+curl -LO https://github.com/imphillip/hermes-tavern/releases/latest/download/hermes-tavern-skills.zip
+```
+
+(Or grab it via your browser from the Releases page.)
+
+Then in your Hermes chat, upload `hermes-tavern-skills.zip` and say
+**"install this skill"**. The bundled wheel inside puts the
+`hermes-tavern` CLI on PATH automatically.
+
+From here on, every interaction is just upload-and-talk as shown above.
+
+### Or build from HEAD
+
+If you want unreleased changes (e.g. tracking `main`):
 
 ```bash
 git clone https://github.com/imphillip/hermes-tavern.git
 cd hermes-tavern && zip -r hermes-tavern-skills.zip skills/
 ```
 
-In your Hermes chat, upload `hermes-tavern-skills.zip` and say
-**"install this skill"**. Zip the whole `skills/` directory, not
-individual sub-skills — Hermes expects the `skills/<name>/SKILL.md`
-layout and uses the bundled wheel under
-`skills/hermes-tavern/assets/` to put the `hermes-tavern` CLI on PATH.
-
-From here on, every interaction is just upload-and-talk as shown above.
+Zip the whole `skills/` directory, not individual sub-skills —
+Hermes expects the `skills/<name>/SKILL.md` layout. Then upload in
+your Hermes chat as above.
 
 ### Or via Hermes hub
 

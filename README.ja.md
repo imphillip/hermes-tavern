@@ -42,21 +42,33 @@ Hermes チャット(Telegram、Discord、QQ、メール——Hermes が話せる
 
 ## インストール
 
-ファイルを 1 回アップロードするだけ。Hermes が動いていればターミナルは不要:
+**最も簡単な方法** —— [最新リリース](https://github.com/imphillip/hermes-tavern/releases/latest)
+からビルド済みの zip をダウンロードします:
+
+```bash
+curl -LO https://github.com/imphillip/hermes-tavern/releases/latest/download/hermes-tavern-skills.zip
+```
+
+(ブラウザから Releases ページ経由でも取得できます。)
+
+そのうえで Hermes チャットに `hermes-tavern-skills.zip` をアップロードし、
+**「この skill をインストールして」** と伝えてください。zip に同梱された wheel が
+`hermes-tavern` CLI を自動的に PATH に通します。
+
+これ以降、すべてのやり取りは上で示した「アップロードして話す」だけです。
+
+### あるいは HEAD からビルド
+
+未リリースの変更を試したい場合(例えば `main` ブランチを追跡したいとき):
 
 ```bash
 git clone https://github.com/imphillip/hermes-tavern.git
 cd hermes-tavern && zip -r hermes-tavern-skills.zip skills/
 ```
 
-Hermes チャットで `hermes-tavern-skills.zip` をアップロードし、
-**「この skill をインストールして」** と伝えてください。
 個別のサブ skill ではなく `skills/` ディレクトリ全体を zip にしてください——
-Hermes は `skills/<name>/SKILL.md` のレイアウトを期待しており、
-`skills/hermes-tavern/assets/` に同梱された wheel を使って `hermes-tavern`
-CLI を PATH に通します。
-
-これ以降、すべてのやり取りは上で示した「アップロードして話す」だけです。
+Hermes は `skills/<name>/SKILL.md` のレイアウトを期待しています。
+そのうえで上記と同じ手順でアップロードしてください。
 
 ### あるいは Hermes hub 経由
 
