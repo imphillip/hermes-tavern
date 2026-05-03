@@ -369,6 +369,13 @@ PR 歓迎です。提出前に:
 
 設計議論、バグレポート、機能リクエストの issue も歓迎です。
 
+## 使用例
+
+[agentbox.id](https://agentbox.id) の `soul-loader`(agentbox の魂読み込みフロー)は、
+Hermes ランタイム上で HermesTavern を内部的にインストール・呼び出します。
+詳細は [`agentbox.id/setup/soul-loader.md`](https://agentbox.id/setup/soul-loader.md)
+を参照。
+
 ## ライセンス
 
 [MIT](LICENSE) — © 2026 HermesTavern contributors.

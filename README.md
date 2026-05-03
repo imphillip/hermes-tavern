@@ -375,6 +375,12 @@ PRs welcome. Before opening one:
 Issues for design discussion, bug reports, and feature requests are
 also welcome.
 
+## Used by
+
+[agentbox.id](https://agentbox.id) — `soul-loader`, the agentbox-blessed
+soul-loading flow, installs HermesTavern under the hood. See
+[`agentbox.id/setup/soul-loader.md`](https://agentbox.id/setup/soul-loader.md).
+
 ## License
 
 [MIT](LICENSE) — © 2026 HermesTavern contributors.
