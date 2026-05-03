@@ -1,0 +1,56 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # needed to create the GitHub Release
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Verify bundled wheel matches pyproject version
+        run: |
+          PYPROJECT_VERSION=$(grep -E '^version\s*=\s*"' pyproject.toml | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+          BUNDLED_WHEEL=$(ls skills/hermes-tavern/assets/hermes_tavern-*.whl 2>/dev/null | head -1)
+          if [ -z "$BUNDLED_WHEEL" ]; then
+            echo "::error::No bundled wheel found in skills/hermes-tavern/assets/"
+            exit 1
+          fi
+          BUNDLED_VERSION=$(basename "$BUNDLED_WHEEL" | sed -E 's/^hermes_tavern-([^-]+)-.*$/\1/')
+          TAG_VERSION="${GITHUB_REF#refs/tags/v}"
+          echo "pyproject:  $PYPROJECT_VERSION"
+          echo "bundled:    $BUNDLED_VERSION"
+          echo "tag:        $TAG_VERSION"
+          if [ "$PYPROJECT_VERSION" != "$BUNDLED_VERSION" ] || [ "$PYPROJECT_VERSION" != "$TAG_VERSION" ]; then
+            echo "::error::version mismatch — pyproject, bundled wheel, and tag must all agree"
+            exit 1
+          fi
+
+      - name: Build skills zip
+        run: |
+          zip -r hermes-tavern-skills.zip skills/ -x '*.DS_Store'
+          ls -lh hermes-tavern-skills.zip
+
+      - name: Locate bundled wheel
+        id: wheel
+        run: echo "path=$(ls skills/hermes-tavern/assets/hermes_tavern-*.whl)" >> "$GITHUB_OUTPUT"
+
+      - name: Create release with assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          gh release create "$TAG" \
+            hermes-tavern-skills.zip \
+            "${{ steps.wheel.outputs.path }}" \
+            --title "$TAG" \
+            --generate-notes
