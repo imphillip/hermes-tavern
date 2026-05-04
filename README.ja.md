@@ -211,35 +211,44 @@ SOUL.md / HERMES.md の **どちらか** がこれを超えると切り替わり
 
 ### 蒸留モード(SOUL または HERMES が > 15k)
 
-HermesTavern は設定済みの Hermes CLI(デフォルト `hermes -q`)を shell out
-経由で呼び、レンダリング結果を一回限りの LLM 圧縮にかけたうえで、
-**オリジナルのコンテンツ全体** をフィールドごとにディスクに配置し、
-モデルがランタイムに取得できるようにします。
+HermesTavern は設定済みの Hermes CLI(デフォルト `hermes -q`)を
+shell out 経由で呼び、ソース素材を 8 つの V2 カテゴリへ
+**再配置** するように依頼します(原文の言葉を忠実に保つ ——
+これは創作ではなく **編集作業** です)。各カテゴリの全文がディスクに
+書かれ、SOUL.md は少数の「常時オン」ピックから組み立てられ、
+HERMES.md がカテゴリインデックスになります。
 
 ```
 <HERMES_HOME>/
-├── SOUL.md                          ← LLM 蒸留済みペルソナ(コンパクト)
-├── HERMES.md                        ← 蒸留済み lore + 拡張ファイルのインデックス
+├── SOUL.md                          ← ピック 3 種: identity + personality + roleplay_guides
+├── HERMES.md                        ← Director's Notes + V2 カテゴリインデックス
 └── cards/
     ├── .active.json
     ├── <name>_<ts>.<ext>            ← オリジナルカードのバックアップ
     └── <name>_<ts>/
-        └── extended/                ← オリジナルの全コンテンツ(フィールド別)
-            ├── description.md
-            ├── personality.md
-            ├── scenario.md
-            ├── first_mes.md
-            ├── mes_example.md
-            ├── system_prompt.md
-            ├── post_history_instructions.md
+        └── extended/                ← V2 カテゴリ別、内容は原文に忠実
+            ├── identity.md          ← 名前、年齢、民族、基本情報
+            ├── appearance.md        ← 容姿、声、特徴
+            ├── personality.md       ← 性格、習慣、口調、クセ
+            ├── backstory.md         ← 過去、経歴、人間関係
+            ├── scenario.md          ← 会話の冒頭シーン設定
+            ├── kinks.md             ← 嗜好(ソースカードに記述がある場合のみ)
+            ├── roleplay_guides.md   ← 演じ方の明示的な指示
+            ├── examples.md          ← サンプル対話
             ├── alternate_greetings/01.md, 02.md, ...
-            └── lore/<entry-slug>.md
+            └── lore/<entry-slug>.md ← character_book の各エントリ
 ```
+
+空のカテゴリはファイルが書かれず単純にスキップされます(LLM が「この
+カテゴリに入れる内容はない」と判断したか、または拒否した — どちらも
+HERMES.md インデックス上で「ファイルが見当たらない」こととして
+観察できる信号で、設定中のモデルがこのカードの内容に合っていないことを
+早期に示すサインも兼ねます)。
 
 モデルは会話の冒頭で SOUL.md と HERMES.md のみを静的に読み込み、
 詳細が必要になったときだけ対応する `extended/...md` を開きます——
 だからこそ蒸留モードでは `cd $HERMES_HOME` がより重要になります
-(HERMES.md がフィールド別ファイルへのインデックスを兼ねるため)。
+(HERMES.md がカテゴリ別ファイルへのインデックスを兼ねるため)。
 
 蒸留を無効化する場合は `--no-distill`(本来の予算超過エラーを表面化)。
 蒸留コマンドの上書きは `--distill-cmd "<command>"`。完全なパイプラインは

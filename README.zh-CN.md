@@ -202,32 +202,38 @@ HermesTavern 按渲染后的体积自动选择两种模式之一。阈值是 Her
 ### 蒸馏模式（SOUL 或 HERMES 渲染后 > 15k）
 
 HermesTavern 会 shell out 调你已配好的 Hermes CLI（默认 `hermes -q`），
-对渲染输出做一次性 LLM 压缩，然后把**完整的原始内容**按字段平铺到磁盘，
-让模型在运行时按需读取。
+请它把源素材**重新分发**到 8 个 V2 类别（忠于原文措辞——这是
+**编辑工作，不是创作**）。完整的按类别内容落到磁盘；SOUL.md 由几个
+"常驻精选"类别组合而成；HERMES.md 变成类别索引。
 
 ```
 <HERMES_HOME>/
-├── SOUL.md                          ← LLM 蒸馏后的人格(精简)
-├── HERMES.md                        ← 蒸馏后的 lore + 扩展文件索引
+├── SOUL.md                          ← 精选三类: identity + personality + roleplay_guides
+├── HERMES.md                        ← 导演指令 + V2 类别索引
 └── cards/
     ├── .active.json
     ├── <name>_<ts>.<ext>            ← 原卡备份
     └── <name>_<ts>/
-        └── extended/                ← 完整原始内容,按字段
-            ├── description.md
-            ├── personality.md
-            ├── scenario.md
-            ├── first_mes.md
-            ├── mes_example.md
-            ├── system_prompt.md
-            ├── post_history_instructions.md
+        └── extended/                ← V2 类别,内容忠于原作
+            ├── identity.md          ← 名字、年龄、种族、基本信息
+            ├── appearance.md        ← 外貌、体态、声音、特征
+            ├── personality.md       ← 性格、习惯、说话方式、quirks
+            ├── backstory.md         ← 过往、历史、关系
+            ├── scenario.md          ← 对话开场的设定
+            ├── kinks.md             ← 偏好（仅源卡含此内容时生成）
+            ├── roleplay_guides.md   ← 显式角色扮演指引
+            ├── examples.md          ← 示例对话
             ├── alternate_greetings/01.md, 02.md, ...
-            └── lore/<entry-slug>.md
+            └── lore/<entry-slug>.md ← 每条 character_book entry
 ```
 
-模型在会话开始时只静态读 SOUL.md 和 HERMES.md，之后只在对话需要某些细节时
-才打开对应的 `extended/...md`——所以蒸馏模式下 `cd $HERMES_HOME` 更加重要
-（HERMES.md 是指向各字段文件的索引）。
+空类别会直接跳过不写文件（LLM 要么觉得这个桶没东西可放，要么拒绝处理——
+两种情况都通过 HERMES.md 索引可观察：缺失的文件本身就是信号；这同时
+也是个早期信号，提示当前配置的模型不适合这张卡的内容）。
+
+模型在会话开始时只静态读 SOUL.md 和 HERMES.md，之后只在对话需要某些
+细节时才打开对应的 `extended/...md`——所以蒸馏模式下 `cd $HERMES_HOME`
+更加重要（HERMES.md 是指向各类别文件的索引）。
 
 用 `--no-distill` 关掉蒸馏（让原始的预算超限错误浮出）。
 用 `--distill-cmd "<command>"` 覆盖蒸馏命令。完整管道见
