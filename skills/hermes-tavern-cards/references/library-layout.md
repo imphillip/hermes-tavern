@@ -3,7 +3,7 @@
 The cards manager skill operates entirely on this directory. It is created
 the first time `hermes-tavern import` runs.
 
-**Normal mode** (rendered output ≤ 15k per slot):
+**Small cards** (rendered output ≤ 15k per slot):
 
 ```
 <HERMES_HOME>/
@@ -18,27 +18,31 @@ the first time `hermes-tavern import` runs.
     └── <name>_<ts>.yaml
 ```
 
-**Distillation mode** (triggered when rendered SOUL or HERMES > 15k):
+**Oversized cards** (triggered when rendered SOUL or HERMES > 15k —
+import stages source material on disk and the calling agent writes the
+V2-category files; `hermes-tavern finalize` then assembles the curated
+SOUL.md and indexed HERMES.md):
 
 ```
 <HERMES_HOME>/
-├── SOUL.md                        # LLM-distilled persona (compact)
-├── HERMES.md                      # distilled lore + extended-file index
+├── SOUL.md                        # curated persona (identity + personality + roleplay_guides)
+├── HERMES.md                      # index pointing into extended/
 └── cards/
     ├── .active.json
     ├── <name>_<ts>.<ext>          # original card backup
     └── <name>_<ts>/
-        └── extended/              # full original per-field content
-            ├── description.md
-            ├── alternate_greetings/01.md ...
-            ├── mes_example.md
-            └── lore/<entry>.md
+        ├── source.md              # CLI-staged input for the agent
+        └── extended/
+            ├── identity.md ... examples.md   # agent-written V2 categories
+            ├── alternate_greetings/01.md ... # CLI-staged at import time
+            └── lore/<entry>.md ...           # CLI-staged at import time
 ```
 
 `AGENTS.md` is intentionally never written — Hermes loads it only when
 HERMES.md is absent, so the references would never reach the model.
-Distillation mode merges the index into `HERMES.md`. See
-`../hermes-tavern/references/distillation.md` for the full rationale.
+The oversized-card flow merges the index into `HERMES.md`. See
+`../hermes-tavern/references/oversized-cards.md` for the full rationale,
+the agent procedure, and failure modes.
 
 ## Launch posture
 

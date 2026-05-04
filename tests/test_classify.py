@@ -1,33 +1,29 @@
-"""V2 semantic classification — the LLM-driven step that redistributes
-character content into the eight V2-aligned categories.
+"""Tests for the (now LLM-call-free) classify module.
 
-The classification call replaces the v0.3 single-shot "compress soul +
-lore" distillation with a structured editorial pass that:
+v0.4.5 moved the actual semantic categorization out of this module — the
+agent does it in its own context and writes ``extended/<category>.md``
+files. What classify still owns:
 
-- Preserves source wording (no creative rewriting)
-- Outputs every category, including empty ones (silence is signal)
-- Lets us observe LLM content tolerance via empty/refused categories
-- Auto-detects subheaders inside `description` for cleaner LLM input
+- The canonical V2 categories + display titles + summaries
+- The Classification dataclass that render and finalize consume
+- The deterministic subheader preprocessor used at staging time
+- The reader that loads agent-written category files back into a
+  Classification for finalize to render from
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from pathlib import Path
 
 from hermes_tavern.classify import (
     CATEGORIES,
+    CATEGORY_DESCRIPTIONS,
+    CATEGORY_TITLES,
     SOUL_PICKS,
     Classification,
     _detect_subheaders,
-    build_classification_prompt,
-    parse_classification_response,
+    _strip_h1,
+    load_classification_from_extended,
 )
-
-
-@dataclass
-class FakeProc:
-    stdout: str
-    stderr: str = ""
-    returncode: int = 0
 
 
 def test_categories_are_the_eight_v2_aligned_buckets():
@@ -42,6 +38,14 @@ def test_soul_picks_are_a_strict_subset_of_categories():
     # The "always-on core" picks: who the character is + how to play them.
     # appearance / backstory / scenario / kinks / examples live in extended/.
     assert SOUL_PICKS == ("identity", "personality", "roleplay_guides")
+
+
+def test_titles_and_descriptions_cover_every_category():
+    for cat in CATEGORIES:
+        assert cat in CATEGORY_TITLES
+        assert cat in CATEGORY_DESCRIPTIONS
+        assert CATEGORY_TITLES[cat]
+        assert CATEGORY_DESCRIPTIONS[cat]
 
 
 def test_detect_subheaders_finds_veranna_style_labels():
@@ -84,129 +88,63 @@ def test_detect_subheaders_preserves_multiline_body():
     assert "Speaks softly" in parts[1][1]
 
 
-def test_build_prompt_demands_faithful_redistribution():
-    prompt = build_classification_prompt(
-        {"name": "Aldous", "description": "Just text."},
-        char_name="Aldous",
-    )
-    lower = prompt.lower()
-    assert "preserve the source's wording" in lower
-    assert "do not paraphrase" in lower
-    assert "italic" in lower  # anti-novelistic guard
-    assert "editorial work, not creative writing" in lower
-    # All eight category tags appear in the XML template
-    for cat in CATEGORIES:
-        assert f"<{cat}>" in prompt
-        assert f"</{cat}>" in prompt
-    assert "Aldous" in prompt
-    assert "Just text." in prompt
-
-
-def test_build_prompt_uses_subheader_split_when_present():
-    """Veranna-style subheaders should be passed to the LLM in already-
-    structured form, so it doesn't have to discover them itself."""
-    description = (
-        "Full Name: Echo\n"
-        "Age: 22\n"
-        "Height: 181 cm\n"
-        "Appearance: tall and dark-haired.\n"
-    )
-    prompt = build_classification_prompt(
-        {"name": "Echo", "description": description},
-        char_name="Echo",
-    )
-    assert "already structured by subheaders" in prompt
-    assert "### Full Name" in prompt
-    assert "### Appearance" in prompt
-
-
-def test_build_prompt_passes_through_unstructured_description():
-    """When description has no subheaders, just pass it as one block."""
-    description = "Just a long paragraph of prose with no labels."
-    prompt = build_classification_prompt(
-        {"name": "X", "description": description},
-        char_name="X",
-    )
-    assert "already structured by subheaders" not in prompt
-    assert description in prompt
-
-
-def test_parse_response_extracts_eight_categories():
-    body = (
-        "<identity>Echo, 22, ambivert.</identity>\n"
-        "<appearance>Tall, dark-haired.</appearance>\n"
-        "<personality>Quiet observer.</personality>\n"
-        "<backstory></backstory>\n"
-        "<scenario>Standing alone at a café.</scenario>\n"
-        "<kinks></kinks>\n"
-        "<roleplay_guides>Stay in voice.</roleplay_guides>\n"
-        "<examples></examples>\n"
-    )
-    result = parse_classification_response(body)
-    assert isinstance(result, Classification)
-    assert set(result.categories.keys()) == set(CATEGORIES)
-    assert result.categories["identity"] == "Echo, 22, ambivert."
-    assert result.categories["backstory"] == ""
-    assert result.categories["kinks"] == ""
-    assert result.categories["scenario"] == "Standing alone at a café."
-
-
-def test_parse_response_treats_missing_tags_as_empty_categories():
-    """LLM refusal or partial output: missing tags become empty strings.
-    This is the 'tolerance probe' signal — empty categories are observable
-    without raising."""
-    body = "<identity>Echo</identity>"  # only identity returned
-    result = parse_classification_response(body)
-    assert result.categories["identity"] == "Echo"
-    for cat in CATEGORIES:
-        if cat != "identity":
-            assert result.categories[cat] == ""
-
-
 def test_classification_non_empty_filters_blanks():
     """Convenience accessor for downstream consumers."""
-    body = (
-        "<identity>Echo</identity>\n"
-        "<appearance></appearance>\n"
-        "<personality>Quiet.</personality>\n"
-        "<backstory></backstory>\n"
-        "<scenario></scenario>\n"
-        "<kinks></kinks>\n"
-        "<roleplay_guides></roleplay_guides>\n"
-        "<examples></examples>\n"
-    )
-    result = parse_classification_response(body)
-    non_empty = result.non_empty()
+    c = Classification(categories={
+        "identity": "Echo",
+        "appearance": "",
+        "personality": "Quiet.",
+        "backstory": "",
+        "scenario": "",
+        "kinks": "",
+        "roleplay_guides": "",
+        "examples": "",
+    })
+    non_empty = c.non_empty()
     assert set(non_empty.keys()) == {"identity", "personality"}
 
 
-def test_classify_uses_runner_injection(tmp_path):
-    """The runner seam lets tests bypass the real subprocess call."""
-    from hermes_tavern.classify import classify
+def test_strip_h1_removes_leading_heading_and_blanks():
+    body = "# Identity\n\nBody line one.\nBody line two.\n"
+    out = _strip_h1(body)
+    assert out == "Body line one.\nBody line two.\n"
 
-    captured: dict = {}
 
-    def runner(argv):
-        captured["argv"] = argv
-        return FakeProc(
-            stdout=(
-                "<identity>X.</identity>\n"
-                "<appearance></appearance>\n"
-                "<personality></personality>\n"
-                "<backstory></backstory>\n"
-                "<scenario></scenario>\n"
-                "<kinks></kinks>\n"
-                "<roleplay_guides></roleplay_guides>\n"
-                "<examples></examples>\n"
-            )
-        )
+def test_strip_h1_no_op_when_no_h1():
+    body = "Body line one.\nBody line two.\n"
+    assert _strip_h1(body) == "Body line one.\nBody line two.\n"
 
-    result = classify(
-        {"name": "X", "description": "Just X."},
-        char_name="X",
-        runner=runner,
-    )
-    assert result.categories["identity"] == "X."
-    # The argv passed in includes the prompt as a single trailing arg
-    assert captured["argv"][0] == "hermes"
-    assert any("editorial work" in arg for arg in captured["argv"])
+
+def test_strip_h1_handles_empty():
+    assert _strip_h1("") == ""
+
+
+def test_load_classification_from_extended(tmp_path: Path):
+    extended = tmp_path / "extended"
+    extended.mkdir()
+    (extended / "identity.md").write_text(
+        "# Identity\n\nEcho, 22.\n", "utf-8")
+    (extended / "personality.md").write_text(
+        "Quiet observer.\n", "utf-8")  # no H1 — finalize tolerates it
+    # Skip writing the others; they should come back as empty strings.
+
+    c = load_classification_from_extended(extended)
+    assert isinstance(c, Classification)
+    assert set(c.categories.keys()) == set(CATEGORIES)
+    assert c.categories["identity"] == "Echo, 22.\n"
+    assert c.categories["personality"] == "Quiet observer.\n"
+    for cat in CATEGORIES:
+        if cat not in {"identity", "personality"}:
+            assert c.categories[cat] == ""
+
+    # non_empty() reflects the LLM-tolerance signal
+    assert set(c.non_empty().keys()) == {"identity", "personality"}
+
+
+def test_load_classification_from_missing_dir_is_all_empty(tmp_path: Path):
+    """If the extended/ dir doesn't exist yet, every category is empty —
+    the typical state right after staging, before the agent has done its
+    work."""
+    missing = tmp_path / "no_such_dir"
+    c = load_classification_from_extended(missing)
+    assert all(v == "" for v in c.categories.values())

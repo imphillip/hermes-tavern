@@ -8,13 +8,14 @@ from pathlib import Path
 from typing import Sequence
 
 from . import __version__, library
-from .distill import DEFAULT_DISTILL_CMD, DistillationError
+from .library import NeedsAgentCategorizationError, OVERSIZE_THRESHOLD
 from .parse import CardError, load_card
 from .render import BudgetExceededError, render
 from .scan import Finding, scan_card
 from .snapshots import SnapshotError
 
 _EXIT_OK = 0
+_EXIT_NEEDS_AGENT = 2  # also used as the "usage" exit, by argparse convention
 _EXIT_USAGE = 2
 _EXIT_FAIL = 1
 
@@ -31,17 +32,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     except CardError as exc:
         print(f"hermes-tavern: card error: {exc}", file=sys.stderr)
         return _EXIT_USAGE
+    except NeedsAgentCategorizationError as exc:
+        _print_agent_handoff(exc)
+        return _EXIT_NEEDS_AGENT
     except library.LibraryError as exc:
         print(f"hermes-tavern: {exc}", file=sys.stderr)
         return _EXIT_USAGE
     except SnapshotError as exc:
         print(f"hermes-tavern: {exc}", file=sys.stderr)
         return _EXIT_USAGE
-    except DistillationError as exc:
-        print(f"hermes-tavern: distillation failed: {exc}", file=sys.stderr)
-        print("hermes-tavern: pass --no-distill to fall back and surface the original "
-              "budget error instead.", file=sys.stderr)
-        return _EXIT_FAIL
     except BudgetExceededError as exc:
         print(
             f"hermes-tavern: {exc.kind} is too large ({exc.size}/{exc.limit} chars). "
@@ -70,18 +69,29 @@ def _build_parser() -> argparse.ArgumentParser:
                           help="Render the card's system_prompt and post_history_instructions in their "
                                "high-trust V2 positions instead of inside untrusted blockquotes. Only use "
                                "for cards from authors you trust.")
-    p_import.add_argument("--no-distill", dest="allow_distill", action="store_false", default=True,
-                          help="Do not invoke the distillation command for oversized cards; fail with "
-                               "the original budget error instead.")
-    p_import.add_argument("--distill-cmd", default=DEFAULT_DISTILL_CMD,
-                          help=f"Command to shell out to for distillation (default: {DEFAULT_DISTILL_CMD!r}). "
-                               "The prompt is appended as a final argument.")
     soul_only_grp = p_import.add_mutually_exclusive_group()
     soul_only_grp.add_argument("--no-hermes-md", dest="soul_only", action="store_true",
                                help="Skip HERMES.md even if the card has a lorebook")
     soul_only_grp.add_argument("--soul-only", dest="soul_only", action="store_true",
                                help="Alias for --no-hermes-md")
     p_import.set_defaults(handler=_cmd_import, soul_only=False)
+
+    p_finalize = sub.add_parser(
+        "finalize",
+        help="Assemble SOUL.md / HERMES.md from agent-written extended/ files (oversized cards).",
+    )
+    p_finalize.add_argument("--card", required=True,
+                            help="Card filename or character name (case-insensitive prefix match)")
+    p_finalize.add_argument("--home", required=True, type=Path)
+    p_finalize.add_argument("--user-noun", default=library.DEFAULT_USER_NOUN,
+                            help="How {{user}} should be addressed")
+    p_finalize.add_argument("--trust-system-prompt", action="store_true",
+                            help="Same semantics as on `import`. (Currently only affects active-record "
+                                 "metadata in finalize mode.)")
+    p_finalize.add_argument("--no-overwrite", dest="overwrite", action="store_false", default=True,
+                            help="Refuse to replace existing SOUL.md / HERMES.md (default: overwrite, "
+                                 "since finalize is the natural completion of an oversize import).")
+    p_finalize.set_defaults(handler=_cmd_finalize)
 
     p_validate = sub.add_parser("validate", help="Parse a card and report field completeness / budget.")
     p_validate.add_argument("--card", required=True, type=Path)
@@ -110,10 +120,6 @@ def _build_parser() -> argparse.ArgumentParser:
                           action="store_true", default=None,
                           help="Override stored trust setting; render system_prompt/"
                                "post_history_instructions in their high-trust positions.")
-    p_switch.add_argument("--no-distill", dest="allow_distill", action="store_false", default=True,
-                          help="Do not invoke the distillation command for oversized cards.")
-    p_switch.add_argument("--distill-cmd", default=DEFAULT_DISTILL_CMD,
-                          help=f"Command to shell out to for distillation (default: {DEFAULT_DISTILL_CMD!r}).")
     p_switch.set_defaults(handler=_cmd_switch)
 
     p_delete = sub.add_parser("delete", help="Soft-delete a card (move to cards/.trash/).")
@@ -177,21 +183,28 @@ def _cmd_import(args: argparse.Namespace) -> int:
         soul_only=args.soul_only,
         overwrite=args.overwrite,
         trust_system_prompt=args.trust_system_prompt,
-        allow_distill=args.allow_distill,
-        distill_command=args.distill_cmd,
     )
     _report_outcome(args.home, outcome, library_path, soul_only=args.soul_only)
     return _EXIT_OK
 
 
+def _cmd_finalize(args: argparse.Namespace) -> int:
+    outcome = library.finalize_card(
+        args.home,
+        args.card,
+        user_noun=args.user_noun,
+        trust_system_prompt=args.trust_system_prompt,
+        overwrite=args.overwrite,
+    )
+    library_path = library.find_card(args.home, args.card)
+    _report_outcome(args.home, outcome, library_path, soul_only=False)
+    return _EXIT_OK
+
+
 def _cmd_validate(args: argparse.Namespace) -> int:
-    from .distill import DISTILL_THRESHOLD
     from .render import SOUL_BUDGET
 
     data = load_card(args.card)
-    # Always render without budget enforcement: validate is informational,
-    # so an oversized card should produce a report (the operator then decides
-    # whether to import with distillation, --no-distill, or trim by hand).
     rendered = render(data, user_noun=args.user_noun, include_hermes_md=True,
                       enforce_budget=False)
     name = data.get("name") or "(no name)"
@@ -211,12 +224,13 @@ def _cmd_validate(args: argparse.Namespace) -> int:
         if rendered.truncated_entries:
             print(f"warning: would drop {rendered.truncated_entries} lorebook entries")
 
-    distill_needed = (
-        len(rendered.soul) > DISTILL_THRESHOLD
-        or (rendered.hermes is not None and len(rendered.hermes) > DISTILL_THRESHOLD)
+    needs_agent = (
+        len(rendered.soul) > OVERSIZE_THRESHOLD
+        or (rendered.hermes is not None and len(rendered.hermes) > OVERSIZE_THRESHOLD)
     )
-    if distill_needed:
-        print("note: would trigger distillation on import (over 75% threshold)")
+    if needs_agent:
+        print("note: import will route through the agent V2-categorization flow "
+              "(over 75% threshold). See SKILL.md 'Oversized card procedure'.")
 
     findings = scan_card(data)
     print(f"scan: {len(findings)} suspicious pattern(s)")
@@ -226,12 +240,11 @@ def _cmd_validate(args: argparse.Namespace) -> int:
 
 
 def _budget_marker(size: int) -> str:
-    from .distill import DISTILL_THRESHOLD
     from .render import SOUL_BUDGET
     if size > SOUL_BUDGET:
-        return "  [over hard cap — distillation required]"
-    if size > DISTILL_THRESHOLD:
-        return "  [over 75% threshold]"
+        return "  [over hard cap — agent categorization required]"
+    if size > OVERSIZE_THRESHOLD:
+        return "  [over 75% threshold — agent categorization on import]"
     return ""
 
 
@@ -258,7 +271,7 @@ def _cmd_current(args: argparse.Namespace) -> int:
     print(f"imported at:         {record.imported_at}")
     print(f"user noun:           {record.user_noun}")
     print(f"trust system prompt: {record.trust_system_prompt}")
-    print(f"distilled:           {record.distilled}")
+    print(f"finalized:           {record.finalized}")
     print(f"SOUL.md:             {library.soul_path(args.home)}"
           f" {'(missing!)' if not library.soul_path(args.home).exists() else ''}")
     if record.has_hermes_md:
@@ -278,14 +291,13 @@ def _cmd_switch(args: argparse.Namespace) -> int:
         user_noun=args.user_noun,
         soul_only=args.soul_only,
         trust_system_prompt=args.trust_system_prompt,
-        allow_distill=args.allow_distill,
-        distill_command=args.distill_cmd,
     )
     data = load_card(target)
     findings = scan_card(data)
     _emit_findings(findings, trust_system_prompt=bool(args.trust_system_prompt))
     print(f"switched to {target.name}")
-    _report_outcome(args.home, outcome, target, soul_only=outcome.rendered.hermes is None and not outcome.distilled)
+    _report_outcome(args.home, outcome, target,
+                    soul_only=outcome.rendered.hermes is None and not outcome.finalized)
     return _EXIT_OK
 
 
@@ -334,20 +346,45 @@ def _cmd_revert(args: argparse.Namespace) -> int:
     return _EXIT_OK
 
 
+def _print_agent_handoff(exc: NeedsAgentCategorizationError) -> None:
+    """Render the structured handoff message the agent looks for."""
+    print(
+        f"hermes-tavern: {exc.char_name} is oversized "
+        f"({exc.rendered_size} chars over the {exc.threshold}-char threshold).",
+        file=sys.stderr,
+    )
+    print("", file=sys.stderr)
+    print("Source material has been staged for the agent at:", file=sys.stderr)
+    print(f"  {exc.source_md_path}", file=sys.stderr)
+    print("", file=sys.stderr)
+    print(
+        "Next step: read that file, redistribute its content into per-category "
+        "files under the sibling extended/ directory (one of: identity.md, "
+        "appearance.md, personality.md, backstory.md, scenario.md, kinks.md, "
+        "roleplay_guides.md, examples.md). Stay faithful to the source wording.",
+        file=sys.stderr,
+    )
+    print("", file=sys.stderr)
+    print(
+        "Then run `hermes-tavern finalize --card <name> --home <home>` to "
+        "assemble SOUL.md and HERMES.md.",
+        file=sys.stderr,
+    )
+    print(
+        "See `hermes-tavern/SKILL.md` → \"Oversized card procedure\" for the full protocol.",
+        file=sys.stderr,
+    )
+
+
 def _report_outcome(home: Path, outcome: library.ApplyOutcome, library_path: Path,
                     *, soul_only: bool) -> None:
     """Print a one-screen summary of what was written."""
     print(f"wrote {library.soul_path(home)}")
-    if outcome.distilled:
-        print(f"  (SOUL distilled from {len(outcome.rendered.soul)} → "
-              f"{outcome.distilled_soul_size} chars)")
-        print(f"wrote {library.hermes_path(home)}"
-              + (f" (with {outcome.distilled_lore_size}-char distilled lore + "
-                 f"{outcome.extended_files}-file index)"
-                 if outcome.distilled_lore_size
-                 else f" (extended-file index only — no lore retained)"))
-        print(f"wrote {outcome.extended_files} extended file(s) under "
-              f"{home / 'cards' / library_path.stem / 'extended'}")
+    if outcome.finalized:
+        print(f"  (curated SOUL from picks: {outcome.curated_soul_size} chars)")
+        print(f"wrote {library.hermes_path(home)} "
+              f"(index over {outcome.extended_files} extended file(s))")
+        print(f"extended files at {home / 'cards' / library_path.stem / 'extended'}")
     else:
         if outcome.wrote_hermes_md:
             print(f"wrote {library.hermes_path(home)}")

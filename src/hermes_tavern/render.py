@@ -157,9 +157,9 @@ def render_curated_soul(
     return soul
 
 
-# Forward declaration so the type hint above resolves without forcing an
-# import-time dependency cycle (classify imports from distill, extended
-# imports from classify, render imports from neither at module top).
+# Forward declaration so the Classification type hint above resolves
+# without forcing an import-time cycle (extended imports from classify;
+# render imports from neither at module top).
 if False:  # pragma: no cover
     from .classify import Classification  # noqa: F401
 

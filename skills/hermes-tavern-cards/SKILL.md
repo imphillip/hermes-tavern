@@ -1,7 +1,7 @@
 ---
 name: hermes-tavern-cards
 description: "Manage SillyTavern character cards already imported into HERMES_HOME — list, show current, switch active, soft-delete, restore."
-version: 0.4.0
+version: 0.4.5
 author: HermesTavern contributors
 license: MIT
 metadata:
@@ -106,7 +106,7 @@ If a query is ambiguous, the command refuses and lists the candidates.
 - `../hermes-tavern/references/usage-recipes.md` — switching / deleting / restoring recipes (shared with the loader skill)
 - `../hermes-tavern/references/field-mapping.md` — V2 → markdown rendering rules (used when re-rendering on switch)
 - `../hermes-tavern/references/security.md` — threat model and how `--trust-system-prompt` interacts with `switch`
-- `../hermes-tavern/references/distillation.md` — when `switch` triggers re-distillation; `--no-distill` / `--distill-cmd` flags
+- `../hermes-tavern/references/oversized-cards.md` — what `switch` does on a card that needs the agent V2-categorization flow
 
 ## Files this skill writes
 

@@ -1,6 +1,6 @@
 """Card library inside ``<HERMES_HOME>/cards/``.
 
-Layout (normal mode)::
+Layout (small cards — fits in always-on context as-is)::
 
     <HERMES_HOME>/
     ├── SOUL.md                 # active persona (rendered)
@@ -8,22 +8,34 @@ Layout (normal mode)::
     └── cards/
         ├── .active.json        # pointer to currently active card
         ├── .trash/             # soft-deleted cards
-        └── <name>_<ts>.<ext>   # imported card payloads
+        └── <name>_<ts>.<ext>   # imported card payload
 
-Layout (distillation mode — triggered when SOUL or HERMES would exceed
-75% of the Hermes 20k slot)::
+Layout (oversized cards — requires agent V2 categorization)::
 
     <HERMES_HOME>/
-    ├── SOUL.md                 # LLM-distilled persona (compact)
-    ├── HERMES.md               # distilled lore + index pointing to extended/
+    ├── SOUL.md                 # curated persona (identity + personality + roleplay_guides)
+    ├── HERMES.md               # index pointing into extended/
     └── cards/
         ├── .active.json
-        ├── <name>_<ts>.<ext>
-        └── <name>_<ts>/extended/
-            ├── description.md
-            ├── alternate_greetings/01.md ...
-            ├── mes_example.md
-            └── lore/<entry>.md
+        ├── <name>_<ts>.<ext>   # source card
+        └── <name>_<ts>/
+            ├── source.md       # CLI-staged input for the agent
+            └── extended/
+                ├── identity.md ... examples.md   # agent-written V2 categories
+                ├── alternate_greetings/01.md ... # CLI-staged at import time
+                └── lore/<entry>.md ...           # CLI-staged at import time
+
+The flow on oversize is:
+
+1. ``import_card`` copies the card into the library and calls ``apply_card``.
+2. ``apply_card`` detects that the rendered SOUL.md / HERMES.md would
+   exceed the always-on budget. It writes ``source.md`` plus the
+   per-entry payloads, then raises :class:`NeedsAgentCategorizationError`.
+3. The agent (working from the SKILL.md procedure) reads ``source.md``
+   and writes one ``extended/<category>.md`` per V2 category.
+4. The user runs ``hermes-tavern finalize``, which calls
+   :func:`finalize_card` here to assemble the curated SOUL.md and the
+   indexed HERMES.md from the on-disk material.
 
 HermesTavern intentionally **never writes AGENTS.md, MEMORY.md, or
 USER.md**. AGENTS.md is shadowed by HERMES.md per Hermes's loader
@@ -46,15 +58,54 @@ from pathlib import Path
 from typing import Any
 
 from . import classify as classify_mod
-from . import distill as distill_mod
 from . import extended as extended_mod
 from . import render as render_mod
 from . import snapshots as snap_mod
+from . import staging as staging_mod
 from .parse import load_card
 from .render import SOUL_BUDGET, BudgetExceededError, RenderResult, render
-from .snapshots import Snapshot, SnapshotError
+from .snapshots import Snapshot
+from .staging import NeedsAgentCategorizationError
+
+# Re-export so callers don't need to reach into staging.
+__all__ = [
+    "ActiveRecord",
+    "AlreadyExistsError",
+    "AmbiguousCardError",
+    "ApplyOutcome",
+    "CardEntry",
+    "CardNotFoundError",
+    "DEFAULT_USER_NOUN",
+    "LibraryError",
+    "NeedsAgentCategorizationError",
+    "apply_card",
+    "cards_dir",
+    "clear_active",
+    "copy_into_library",
+    "delete_card",
+    "ensure_layout",
+    "find_card",
+    "finalize_card",
+    "get_meta",
+    "hermes_path",
+    "import_card",
+    "list_cards",
+    "list_history",
+    "read_active",
+    "restore_card",
+    "revert_to",
+    "soul_path",
+    "switch_to",
+    "trash_dir",
+    "write_active",
+    "write_outputs",
+]
 
 DEFAULT_USER_NOUN = "the visitor"
+# 75% of the 20k Hermes slot. Above this, we route through the agent
+# categorization flow rather than try to ship the rendered text as-is.
+OVERSIZE_THRESHOLD = 15_000
+
 _ACTIVE_FILE = ".active.json"
 _TRASH_DIR = ".trash"
 _CARD_SUFFIXES = {".json", ".png", ".yaml", ".yml"}
@@ -86,7 +137,7 @@ class ActiveRecord:
     soul_only: bool = False
     has_hermes_md: bool = False
     trust_system_prompt: bool = False
-    distilled: bool = False
+    finalized: bool = False  # True iff this card went through the agent categorization flow
     extended_dir: str | None = None  # relative to home
 
     def to_json(self) -> str:
@@ -103,7 +154,8 @@ class ActiveRecord:
             soul_only=payload.get("soul_only", False),
             has_hermes_md=payload.get("has_hermes_md", False),
             trust_system_prompt=payload.get("trust_system_prompt", False),
-            distilled=payload.get("distilled", False),
+            # accept legacy `distilled` key as the same signal
+            finalized=payload.get("finalized", payload.get("distilled", False)),
             extended_dir=payload.get("extended_dir"),
         )
 
@@ -140,6 +192,18 @@ def _extended_dir_for(card_file: str, home: Path) -> Path:
 def _stem_dir_for(card_file: str, home: Path) -> Path:
     """Parent of the extended/ dir — the per-card directory inside cards/."""
     return cards_dir(home) / Path(card_file).stem
+
+
+def _has_agent_categorization(extended_dir: Path) -> bool:
+    """True iff at least one V2 category file exists in extended/. Used
+    to distinguish ``apply_card`` re-runs after the agent has populated
+    extended/ from cold imports that still need the agent."""
+    if not extended_dir.is_dir():
+        return False
+    return any(
+        (extended_dir / f"{cat}.md").is_file()
+        for cat in classify_mod.CATEGORIES
+    )
 
 
 def _active_path(home: Path) -> Path:
@@ -262,14 +326,14 @@ def copy_into_library(home: Path, src: Path, *, name: str) -> Path:
 
 @dataclass
 class ApplyOutcome:
-    """Returned by :func:`apply_card`. Captures what was actually written so
-    the CLI can render an accurate one-screen summary."""
+    """Returned by :func:`apply_card` and :func:`finalize_card`. Captures
+    what was actually written so the CLI can render an accurate one-screen
+    summary."""
 
     rendered: RenderResult
     wrote_hermes_md: bool
-    distilled: bool = False
-    distilled_soul_size: int | None = None
-    distilled_lore_size: int | None = None
+    finalized: bool = False
+    curated_soul_size: int | None = None
     extended_files: int = 0
 
 
@@ -315,19 +379,14 @@ def write_outputs(
     return _write_outputs_normal(home, rendered, overwrite=overwrite, write_hermes=write_hermes)
 
 
-def _write_outputs_distilled(
+def _write_outputs_finalized(
     home: Path,
     *,
     soul: str,
     hermes: str,
     overwrite: bool,
 ) -> None:
-    """Distilled-mode write: SOUL.md + HERMES.md (with distilled lore + index).
-
-    AGENTS.md is intentionally never written — Hermes shadows it with
-    HERMES.md, so the references must live inside HERMES.md to reach the
-    model.
-    """
+    """Finalize-mode write: curated SOUL.md + indexed HERMES.md."""
     soul_p = soul_path(home)
     hermes_p = hermes_path(home)
     if not overwrite:
@@ -345,23 +404,29 @@ def apply_card(
     soul_only: bool = False,
     overwrite: bool = False,
     trust_system_prompt: bool = False,
-    allow_distill: bool = True,
-    distill_command: str = distill_mod.DEFAULT_DISTILL_CMD,
-    distill_runner: object | None = None,
     action: str = "apply",
 ) -> ApplyOutcome:
-    """Render and write SOUL/HERMES (and extended in distilled mode).
+    """Render and write SOUL.md / HERMES.md for ``card_path``.
+
+    Three exit paths:
+
+    1. **Fits in always-on context** (≤ 15k per slot) → render directly,
+       write SOUL.md + HERMES.md, return ``ApplyOutcome``.
+    2. **Oversized but extended/ already populated by the agent** →
+       behave like ``finalize_card`` (assemble from on-disk material).
+       This is what ``switch_to`` hits when re-activating an already-
+       finalized oversized card.
+    3. **Oversized, no agent work yet** → write ``source.md`` and the
+       per-entry payloads to ``cards/<stem>/``, then raise
+       :class:`NeedsAgentCategorizationError`. The CLI converts that to
+       exit code 2 plus a message pointing at the SKILL.md procedure.
 
     Captures a pristine snapshot on first invocation, then a snapshot
     after the mutation completes — allowing later ``revert`` operations.
     """
-    # Snapshot the pristine state before any HermesTavern write.
     snap_mod.ensure_pristine(home, soul=soul_path(home), hermes=hermes_path(home))
 
     data = load_card(card_path)
-    # Render without budget enforcement so oversized output can still flow
-    # into the distillation pipeline; we re-impose the hard cap manually
-    # below for the non-distilled path.
     rendered = render(
         data,
         user_noun=user_noun,
@@ -372,15 +437,14 @@ def apply_card(
     char_name = (data.get("name") or card_path.stem).strip()
     now = datetime.now(timezone.utc).isoformat(timespec="seconds")
 
-    should_distill = (
-        allow_distill
-        and not soul_only  # --soul-only opts out of the agents/extended layout
-        and distill_mod.needs_distillation(rendered.soul, rendered.hermes)
+    is_oversized = (
+        not soul_only and (
+            len(rendered.soul) > OVERSIZE_THRESHOLD
+            or (rendered.hermes is not None and len(rendered.hermes) > OVERSIZE_THRESHOLD)
+        )
     )
 
-    if not should_distill:
-        # Hard cap still applies on the non-distilled path: refuse to write
-        # something Hermes can't load.
+    if not is_oversized:
         if len(rendered.soul) > SOUL_BUDGET:
             raise BudgetExceededError("SOUL.md", len(rendered.soul), SOUL_BUDGET)
         if rendered.hermes is not None and len(rendered.hermes) > SOUL_BUDGET:
@@ -396,7 +460,7 @@ def apply_card(
             soul_only=soul_only,
             has_hermes_md=wrote_hermes,
             trust_system_prompt=trust_system_prompt,
-            distilled=False,
+            finalized=False,
         )
         write_active(home, record)
         snap_mod.take_snapshot(
@@ -408,32 +472,66 @@ def apply_card(
             hermes=hermes_path(home),
             active_record=asdict(record),
         )
-        return ApplyOutcome(rendered=rendered, wrote_hermes_md=wrote_hermes, distilled=False)
+        return ApplyOutcome(rendered=rendered, wrote_hermes_md=wrote_hermes, finalized=False)
 
-    # Distillation path: V2 semantic classification → category-based
-    # extended/ files → curated SOUL.md from picks, indexed HERMES.md.
-    classification = classify_mod.classify(
-        data,
-        char_name=char_name,
-        command=distill_command,
-        runner=distill_runner,
-    )
-
+    # Oversized. If the agent has already written V2 categories, finalize
+    # straight from disk (this is the switch_to-an-already-finalized path).
     extended_dir = _extended_dir_for(card_path.name, home)
-    # Replace any prior extended/ dir for this same card.
-    if extended_dir.exists():
-        shutil.rmtree(extended_dir)
-    files = extended_mod.write_extended_classified(
-        home, extended_dir, classification, data, user_noun=user_noun
+    if _has_agent_categorization(extended_dir):
+        return _finalize_in_place(
+            home,
+            card_path=card_path,
+            data=data,
+            rendered=rendered,
+            user_noun=user_noun,
+            trust_system_prompt=trust_system_prompt,
+            overwrite=overwrite,
+            action=action,
+            now=now,
+        )
+
+    # Cold oversize: stage source.md + per-entry payloads, raise.
+    source_md = staging_mod.write_source_md(
+        extended_dir, data,
+        char_name=char_name, user_noun=user_noun,
     )
+    rendered_size = max(
+        len(rendered.soul),
+        len(rendered.hermes) if rendered.hermes is not None else 0,
+    )
+    raise NeedsAgentCategorizationError(
+        char_name=char_name,
+        source_md_path=source_md,
+        rendered_size=rendered_size,
+        threshold=OVERSIZE_THRESHOLD,
+    )
+
+
+def _finalize_in_place(
+    home: Path,
+    *,
+    card_path: Path,
+    data: dict[str, Any],
+    rendered: RenderResult,
+    user_noun: str,
+    trust_system_prompt: bool,
+    overwrite: bool,
+    action: str,
+    now: str,
+) -> ApplyOutcome:
+    """Shared assembly step for ``apply_card`` (re-run after agent work)
+    and ``finalize_card`` (explicit finalize invocation)."""
+    char_name = (data.get("name") or card_path.stem).strip()
+    extended_dir = _extended_dir_for(card_path.name, home)
+
+    classification = classify_mod.load_classification_from_extended(extended_dir)
     soul_md = render_mod.render_curated_soul(
         char_name, classification, user_noun=user_noun
     )
-    hermes_md = extended_mod.render_distilled_hermes_md(
-        char_name, distilled_lore=None, extended=files
-    )
+    extended_files = extended_mod.collect_extended_files(home, extended_dir, char_name)
+    hermes_md = extended_mod.render_indexed_hermes_md(char_name, extended_files)
 
-    _write_outputs_distilled(home, soul=soul_md, hermes=hermes_md, overwrite=overwrite)
+    _write_outputs_finalized(home, soul=soul_md, hermes=hermes_md, overwrite=overwrite)
 
     record = ActiveRecord(
         name=char_name,
@@ -443,7 +541,7 @@ def apply_card(
         soul_only=False,
         has_hermes_md=True,
         trust_system_prompt=trust_system_prompt,
-        distilled=True,
+        finalized=True,
         extended_dir=str(extended_dir.relative_to(home)),
     )
     write_active(home, record)
@@ -459,10 +557,56 @@ def apply_card(
     return ApplyOutcome(
         rendered=rendered,
         wrote_hermes_md=True,
-        distilled=True,
-        distilled_soul_size=len(soul_md),
-        distilled_lore_size=None,  # no separate lore distillation in v0.4
-        extended_files=len(files),
+        finalized=True,
+        curated_soul_size=len(soul_md),
+        extended_files=len(extended_files),
+    )
+
+
+def finalize_card(
+    home: Path,
+    query: str,
+    *,
+    user_noun: str = DEFAULT_USER_NOUN,
+    trust_system_prompt: bool = False,
+    overwrite: bool = True,
+    action: str = "finalize",
+) -> ApplyOutcome:
+    """Assemble curated SOUL.md + indexed HERMES.md from agent-written
+    ``extended/<category>.md`` files. Default ``overwrite=True`` because
+    finalize is the natural completion of an oversize import that already
+    placed staging artifacts on disk.
+
+    Raises :class:`LibraryError` if the agent hasn't written any V2
+    category files yet — the operator probably skipped the agent step.
+    """
+    snap_mod.ensure_pristine(home, soul=soul_path(home), hermes=hermes_path(home))
+
+    card_path = find_card(home, query)
+    extended_dir = _extended_dir_for(card_path.name, home)
+    if not _has_agent_categorization(extended_dir):
+        raise LibraryError(
+            f"no agent categorization found in {extended_dir}; expected at "
+            "least one of identity.md/personality.md/etc. — see SKILL.md "
+            "'Oversized card procedure'."
+        )
+
+    data = load_card(card_path)
+    rendered = render(
+        data, user_noun=user_noun, include_hermes_md=True,
+        trust_system_prompt=trust_system_prompt, enforce_budget=False,
+    )
+    now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    return _finalize_in_place(
+        home,
+        card_path=card_path,
+        data=data,
+        rendered=rendered,
+        user_noun=user_noun,
+        trust_system_prompt=trust_system_prompt,
+        overwrite=overwrite,
+        action=action,
+        now=now,
     )
 
 
@@ -474,11 +618,14 @@ def import_card(
     soul_only: bool = False,
     overwrite: bool = False,
     trust_system_prompt: bool = False,
-    allow_distill: bool = True,
-    distill_command: str = distill_mod.DEFAULT_DISTILL_CMD,
-    distill_runner: object | None = None,
 ) -> tuple[ApplyOutcome, Path]:
-    """Copy ``src`` into the library and apply it as the active persona."""
+    """Copy ``src`` into the library and apply it as the active persona.
+
+    For oversized cards this propagates :class:`NeedsAgentCategorizationError`
+    after staging — the source card is left in the library, the staging
+    artifacts (source.md, lorebook payloads) are written, and the CLI
+    surfaces the agent procedure to the user.
+    """
     data = load_card(src)
     name = (data.get("name") or src.stem).strip()
     library_path = copy_into_library(home, src, name=name)
@@ -489,9 +636,6 @@ def import_card(
         soul_only=soul_only,
         overwrite=overwrite,
         trust_system_prompt=trust_system_prompt,
-        allow_distill=allow_distill,
-        distill_command=distill_command,
-        distill_runner=distill_runner,
         action="import",
     )
     return outcome, library_path
@@ -500,8 +644,9 @@ def import_card(
 def delete_card(home: Path, query: str) -> Path:
     """Soft-delete a card by moving it to ``cards/.trash/``.
 
-    The card's per-card directory (``cards/<stem>/``, holding ``extended/``)
-    is moved alongside the card payload so restore brings everything back.
+    The card's per-card directory (``cards/<stem>/``, holding ``extended/``
+    + ``source.md``) is moved alongside the card payload so restore brings
+    everything back.
     """
     ensure_layout(home)
     src = find_card(home, query)
@@ -547,16 +692,13 @@ def switch_to(
     user_noun: str | None = None,
     soul_only: bool | None = None,
     trust_system_prompt: bool | None = None,
-    allow_distill: bool = True,
-    distill_command: str = distill_mod.DEFAULT_DISTILL_CMD,
-    distill_runner: object | None = None,
 ) -> tuple[Path, ApplyOutcome]:
     """Switch the active persona to a card already in the library.
 
-    Switching always overwrites SOUL.md / HERMES.md (that is its whole point).
-    If ``user_noun`` / ``soul_only`` / ``trust_system_prompt`` are omitted,
-    reuse the previous active record's values when available, otherwise fall
-    back to defaults.
+    Switching always overwrites SOUL.md / HERMES.md. If the target card
+    is oversized but its ``extended/`` is already populated (a previous
+    finalize), the switch reuses those files. If it's oversized and not
+    yet finalized, :class:`NeedsAgentCategorizationError` propagates.
     """
     target = find_card(home, query)
     previous = read_active(home)
@@ -574,9 +716,6 @@ def switch_to(
         soul_only=chosen_soul_only,
         overwrite=True,
         trust_system_prompt=chosen_trust,
-        allow_distill=allow_distill,
-        distill_command=distill_command,
-        distill_runner=distill_runner,
         action="switch",
     )
     return target, outcome
@@ -619,8 +758,6 @@ def revert_to(home: Path, query: str) -> Snapshot:
     else:
         clear_active(home)
 
-    # Record the revert as a new snapshot for traceability — includes the
-    # current state which now matches `target`.
     snap_mod.take_snapshot(
         home,
         action="revert",

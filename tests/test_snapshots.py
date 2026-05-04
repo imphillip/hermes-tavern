@@ -156,25 +156,36 @@ def test_snapshot_manifest_round_trip(home: Path, fixtures_dir: Path):
     assert payload["active_record"]["name"] == "Echo"
 
 
-def test_distillation_path_also_snapshots(home: Path, tmp_path: Path):
-    """Snapshots fire for the distillation pipeline too."""
+def test_finalize_path_also_snapshots(home: Path, tmp_path: Path):
+    """Snapshots fire for the agent-driven oversized-card pipeline too:
+    one snapshot at finalize time, capturing curated SOUL.md + indexed
+    HERMES.md."""
+    import pytest as _pytest
+
+    from hermes_tavern.staging import NeedsAgentCategorizationError
+
     big = tmp_path / "big.json"
     big.write_text(
         '{"spec": "chara_card_v2", "data": {"name": "Big", "description": "'
         + "x" * 16_000 + '"}}'
     )
 
-    def fake_runner(argv):
-        class P:
-            stdout = "<soul># Compact</soul><lore>NONE</lore>"
-            stderr = ""
-            returncode = 0
-        return P()
+    # Phase 1 stages source.md and raises (no snapshot yet — nothing was
+    # written into the home root).
+    with _pytest.raises(NeedsAgentCategorizationError) as exc_info:
+        library.import_card(home, big)
+    extended_dir = exc_info.value.source_md_path.parent / "extended"
 
-    library.import_card(home, big, distill_runner=fake_runner)
+    # Phase 2: simulate the agent
+    extended_dir.mkdir(parents=True, exist_ok=True)
+    (extended_dir / "identity.md").write_text("# Identity\n\nBig.\n", "utf-8")
+
+    # Phase 3: finalize — this is the snapshotting moment
+    library.finalize_card(home, "Big")
+
     history = library.list_history(home)
     assert len(history) == 2
     assert history[0].action == "pristine"
-    assert history[1].action == "import"
+    assert history[1].action == "finalize"
     assert history[1].has_soul_md is True
-    assert history[1].has_hermes_md is True  # distillation always writes HERMES.md
+    assert history[1].has_hermes_md is True  # finalize always writes HERMES.md

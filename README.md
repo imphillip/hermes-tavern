@@ -100,10 +100,10 @@ Override with `HERMES_TAVERN_VENV` / `HERMES_TAVERN_BIN`. When
 ### Requirements
 
 - Python ≥ 3.10
-- A working [`hermes`](https://github.com/NousResearch/hermes-agent) CLI
-  if you want distillation for oversized cards (default
-  `--distill-cmd "hermes -q"`; override with `--distill-cmd` or skip
-  with `--no-distill`)
+- For oversized cards, the calling agent (Hermes itself, or whichever
+  agent is driving the import) reads the staged `source.md` and writes
+  per-category files. No separate LLM CLI is shelled out to — the agent
+  uses its own file tools.
 
 ---
 
@@ -139,9 +139,11 @@ What we deliberately don't do:
 - **Three security layers** — visible trust banner, parse-time
   sanitiser (zero-width / RTL-override / control-char strip), red-flag
   pattern scan with prompt-injection categories
-- **Distillation pipeline** — when a card overflows 75% of the Hermes
-  20k slot, shells out to `hermes -q` to compress the prompt-loaded
-  portion and lays out the full original content for runtime retrieval
+- **Agent-driven oversized-card flow** — when a card overflows 75% of
+  the Hermes 20k slot, `import` stages source material on disk and the
+  calling agent redistributes it into V2 categories in its own context
+  (no subprocess LLM call). `hermes-tavern finalize` then assembles the
+  curated SOUL.md and the indexed HERMES.md.
 - **Card library** — list / current / switch / delete / restore over
   the cards imported into a `HERMES_HOME`
 - **Snapshot history** — every `import` / `switch` / `revert` is
@@ -180,11 +182,8 @@ hermes-tavern revert  --home ~/.hermes-roleplay --to 0003
 # (default is to render them inside untrusted blockquotes)
 hermes-tavern import ... --trust-system-prompt
 
-# Disable distillation for oversized cards (surface the budget error)
-hermes-tavern import ... --no-distill
-
-# Use a different distillation command
-hermes-tavern import ... --distill-cmd "claude -p"
+# After the agent has populated extended/<category>.md for an oversized card
+hermes-tavern finalize --card aldous --home ~/.hermes-roleplay
 ```
 
 `switch` / `delete` / `restore` accept either a filename or the
@@ -197,7 +196,7 @@ HermesTavern picks one of two modes per card based on the rendered
 size. The threshold is 75% of the Hermes 20k slot — i.e. 15,000 chars
 — for **either** SOUL.md or HERMES.md.
 
-### Normal mode (rendered output ≤ 15k per slot)
+### Small cards (rendered output ≤ 15k per slot)
 
 ```
 <HERMES_HOME>/
@@ -211,14 +210,15 @@ size. The threshold is 75% of the Hermes 20k slot — i.e. 15,000 chars
     └── <name>_<ts>.<ext>            ← original card backup
 ```
 
-### Distillation mode (rendered SOUL or HERMES > 15k)
+### Oversized cards (rendered SOUL or HERMES > 15k) — agent-driven
 
-HermesTavern shells out to your already-configured Hermes CLI (default
-`hermes -q`) and asks it to **redistribute** the source material into
-eight V2-aligned categories (faithful to original wording — this is
-editorial work, not creative rewriting). The full per-category content
-lands on disk; SOUL.md is composed from a small set of always-on
-picks; HERMES.md becomes the category index.
+HermesTavern does **not** shell out to a separate LLM. Instead `import`
+stages the source material on disk, exits with code 2, and asks the
+calling agent to redistribute that material into eight V2-aligned
+categories — faithful to original wording, declining gracefully when
+content conflicts with policy. After the agent writes the category
+files, `hermes-tavern finalize` assembles the final SOUL.md (from a
+small set of always-on picks) and HERMES.md (the category index).
 
 ```
 <HERMES_HOME>/
@@ -228,34 +228,31 @@ picks; HERMES.md becomes the category index.
     ├── .active.json
     ├── <name>_<ts>.<ext>            ← original card backup
     └── <name>_<ts>/
-        └── extended/                ← V2-aligned categories, faithful content
-            ├── identity.md          ← name, age, ethnicity, basic facts
-            ├── appearance.md        ← physical description, voice, distinctive features
-            ├── personality.md       ← traits, mannerisms, speech style, quirks
-            ├── backstory.md         ← past events, history, relationships
-            ├── scenario.md          ← the situation the conversation opens in
-            ├── kinks.md             ← preferences (only if present in source)
-            ├── roleplay_guides.md   ← explicit portrayal instructions
-            ├── examples.md          ← sample dialogue patterns
-            ├── alternate_greetings/01.md, 02.md, ...
-            └── lore/<entry-slug>.md ← per character_book entry
+        ├── source.md                ← CLI-staged input for the agent
+        └── extended/                ← V2-aligned categories
+            ├── identity.md          ← name, age, ethnicity, basic facts          (agent-written)
+            ├── appearance.md        ← physical description, voice                 (agent-written)
+            ├── personality.md       ← traits, mannerisms, speech style            (agent-written)
+            ├── backstory.md         ← past events, history, relationships         (agent-written)
+            ├── scenario.md          ← the opening situation                       (agent-written)
+            ├── kinks.md             ← preferences (only if present)               (agent-written)
+            ├── roleplay_guides.md   ← explicit portrayal instructions             (agent-written)
+            ├── examples.md          ← sample dialogue patterns                    (agent-written)
+            ├── alternate_greetings/01.md, 02.md, ...                              (CLI-written)
+            └── lore/<entry-slug>.md ← per character_book entry                    (CLI-written)
 ```
 
-Empty categories are simply omitted (the LLM either had nothing to put
-in that bucket, or declined — both are observable signals via the
-HERMES.md index where missing files are visible by their absence; this
-also doubles as an early signal that the configured model isn't a good
-fit for this card's content).
+Empty categories are simply omitted (the agent either had nothing to
+put in that bucket, or declined — both are observable signals via the
+HERMES.md index where missing files are visible by their absence).
 
 The model reads SOUL.md and HERMES.md statically at session start, then
 opens specific `extended/...md` files only when the conversation calls
 for those details — that's why `cd $HERMES_HOME` matters even more
 here (HERMES.md is the index that points at the per-category files).
 
-Opt out of distillation with `--no-distill` (surfaces the original
-budget error). Override the distillation command with
-`--distill-cmd "<command>"`. Full pipeline lives in
-[`skills/hermes-tavern/references/distillation.md`](skills/hermes-tavern/references/distillation.md).
+Full procedure, including failure modes and the `finalize` step, lives
+in [`skills/hermes-tavern/references/oversized-cards.md`](skills/hermes-tavern/references/oversized-cards.md).
 
 ## Files HermesTavern writes — and never writes
 
@@ -291,7 +288,7 @@ The two skills are self-documenting; their `SKILL.md` and
 - [`field-mapping.md`](skills/hermes-tavern/references/field-mapping.md) — exact V2 → markdown rules
 - [`usage-recipes.md`](skills/hermes-tavern/references/usage-recipes.md) — common workflows and gotchas
 - [`security.md`](skills/hermes-tavern/references/security.md) — threat model + sanitiser layers
-- [`distillation.md`](skills/hermes-tavern/references/distillation.md) — oversized-card pipeline
+- [`oversized-cards.md`](skills/hermes-tavern/references/oversized-cards.md) — agent-driven categorization flow for oversized cards
 
 **Reference docs (cards skill)**
 
@@ -327,8 +324,8 @@ categories with content are populated.
 
 - **No keyword-triggered lorebook injection.** All entries are rendered
   as always-on. This trades faithfulness for simplicity and works fine
-  with long-context models; oversized lorebooks are handled by
-  distillation, not gating.
+  with long-context models; oversized lorebooks are handled by the
+  agent-driven extended-files flow, not gating.
 - **No multi-character chat in one Hermes instance.** Run a separate
   `HERMES_HOME` per character.
 - **No channel-level safety controls.** Configure these on the Hermes
@@ -349,15 +346,15 @@ categories with content are populated.
   (`zip aldous.zip aldous.png`) so the IM treats it as an opaque
   binary blob and leaves the bytes untouched. Hermes can unzip and
   import from there.
-- **Distillation of oversized cards can stall on safety-restricted
-  models.** When a card overflows the 15k threshold HermesTavern
-  shells out to `hermes -q` for an LLM compression pass. If the card
-  carries adult or otherwise content-policy-touching material and
-  the underlying model is heavily moderated, the call can take
-  noticeably longer (retries, slow streaming, hard refusals) —
-  sometimes long enough to look frozen. There's no clean fix on the
-  HermesTavern side: point Hermes at a less restrictive model for
-  these cards.
+- **Oversized cards on policy-restricted agents may end up with
+  partial categorization.** When a card overflows the 15k threshold
+  HermesTavern stages source material and asks the calling agent to
+  categorize it. A policy-restricted agent may decline some categories
+  (e.g. `kinks.md`) — those will be absent from the assembled
+  HERMES.md index. The character will still load, but with whatever
+  the agent was willing to keep. If you want a fuller pass, re-run
+  the agent step against `source.md` with a different model and then
+  re-run `hermes-tavern finalize`.
 
 ## Development
 
@@ -367,7 +364,7 @@ python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 
 pytest                    # run the full suite
-pytest -k distill         # run a subset
+pytest -k staging         # run a subset
 pytest tests/test_real_cards_smoke.py   # real-card smoke (auto-skipped without cards)
 ```
 
@@ -377,9 +374,8 @@ content of community cards are too varied to redistribute, so they
 stay local.
 
 The `tests/` suite covers parse, render, substitute, sanitize, scan,
-extended, distill (mocked LLM), library, CLI, and end-to-end pipeline.
-Aim for green; unmocked subprocess tests use a small fake `hermes`
-shell script written into a tempdir.
+classify, staging, extended, finalize, library, CLI, and end-to-end
+pipeline. Aim for green.
 
 ## Contributing
 

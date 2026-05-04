@@ -17,7 +17,7 @@ def test_import_creates_layout(home: Path, fixtures_dir: Path):
     assert active is not None
     assert active.name == "Lyra"
     assert active.has_hermes_md is True
-    assert active.distilled is False
+    assert active.finalized is False
 
 
 def test_import_minimal_no_hermes(home: Path, fixtures_dir: Path):

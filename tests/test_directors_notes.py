@@ -4,8 +4,9 @@ v0.4 to shape *how* the model delivers the persona.
 The notes are baked into both prompt-loaded files:
 - SOUL.md: output style (first-person, italic thoughts, emoji-bracket
   actions) + language adaptation
-- HERMES.md (normal mode and distilled mode): context-usage guidance
-  (reference, not voice; open extended/ only on demand; stay faithful)
+- HERMES.md (small-card mode and oversized-card index mode): context-usage
+  guidance (reference, not voice; open extended/ only on demand; stay
+  faithful)
 
 The metaphor: the LLM is the actor, the source card is the script,
 the director's notes are stage directions that don't rewrite the
@@ -13,7 +14,7 @@ script.
 """
 from pathlib import Path
 
-from hermes_tavern.extended import ExtendedFile, render_distilled_hermes_md
+from hermes_tavern.extended import ExtendedFile, render_indexed_hermes_md
 from hermes_tavern.parse import load_card
 from hermes_tavern.render import render
 
@@ -51,19 +52,15 @@ def test_normal_mode_hermes_md_carries_directors_notes(fixtures_dir: Path):
     assert "voice" in result.hermes.lower()
 
 
-def test_distilled_hermes_md_carries_directors_notes():
+def test_indexed_hermes_md_carries_directors_notes():
     extended = [
         ExtendedFile(
-            relative_path="cards/foo/extended/description.md",
-            title="Full description",
+            relative_path="cards/foo/extended/identity.md",
+            title="Identity",
             summary="biographical detail",
         ),
     ]
-    rendered = render_distilled_hermes_md(
-        char_name="Aldous",
-        distilled_lore="## Compact lore\n\nA brief world summary.",
-        extended=extended,
-    )
+    rendered = render_indexed_hermes_md(char_name="Aldous", extended=extended)
     assert "## Director's Notes (Context Usage)" in rendered
     assert "Aldous" in rendered  # the directive names the character
     assert "extended/" in rendered  # tells the model when to open them

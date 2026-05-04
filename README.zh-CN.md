@@ -96,10 +96,9 @@ bash skills/hermes-tavern/scripts/install.sh
 ### 依赖
 
 - Python ≥ 3.10
-- 想给超大角色卡用蒸馏功能的话，需要一个能跑的
-  [`hermes`](https://github.com/NousResearch/hermes-agent) CLI
-  （默认 `--distill-cmd "hermes -q"`；可用 `--distill-cmd` 覆盖，
-  或用 `--no-distill` 跳过）
+- 超大角色卡的处理由调用方 agent 自己完成（Hermes 本身，或者任何驱动
+  导入流程的 agent）：CLI 把 `source.md` 摆到磁盘上，agent 用自己的
+  文件工具把内容分发到各类别文件。不再 shell out 到任何独立的 LLM CLI。
 
 ---
 
@@ -130,9 +129,10 @@ lorebook 布局的转换器。HermesTavern 就是来补这一环的。
   的话，我在饰演 X"这种回答
 - **三层安全**——可见的信任横幅、解析期消毒（零宽字符 / RTL 覆盖 /
   控制字符清理）、按提示注入类别做的红旗模式扫描
-- **蒸馏管道**——当卡片渲染后超过 Hermes 20k 槽 75% 的阈值，
-  shell out 调 `hermes -q` 压缩进 prompt 的部分，
-  原始内容则按字段平铺到磁盘，供运行时按需读取
+- **超大卡的 agent 驱动流程**——当卡片渲染后超过 Hermes 20k 槽 75% 的阈值，
+  `import` 把源素材摆到磁盘上，调用方 agent 在自己的上下文里把内容
+  分发到 V2 类别（不再 shell out 到任何子进程 LLM）。之后由
+  `hermes-tavern finalize` 拼出精选 SOUL.md 和索引化的 HERMES.md。
 - **角色卡库**——对已导入到 `HERMES_HOME` 的卡做 list / current / switch /
   delete / restore
 - **快照历史**——每次 `import` / `switch` / `revert` 都被捕获到
@@ -170,11 +170,8 @@ hermes-tavern revert  --home ~/.hermes-roleplay --to 0003
 # （默认会渲染进不可信引用块里）
 hermes-tavern import ... --trust-system-prompt
 
-# 关掉超大卡的蒸馏（让原始的预算超限错误浮出）
-hermes-tavern import ... --no-distill
-
-# 用别的命令做蒸馏
-hermes-tavern import ... --distill-cmd "claude -p"
+# agent 把超大卡的 extended/<category>.md 写完之后，跑这一步收尾
+hermes-tavern finalize --card aldous --home ~/.hermes-roleplay
 ```
 
 `switch` / `delete` / `restore` 接受文件名或角色名（对解析得到的 `name`
@@ -185,7 +182,7 @@ hermes-tavern import ... --distill-cmd "claude -p"
 HermesTavern 按渲染后的体积自动选择两种模式之一。阈值是 Hermes 20k 槽的
 75%——也就是 15,000 字符——SOUL.md 或 HERMES.md **任意一个**超过都会触发。
 
-### 普通模式（每个槽渲染输出 ≤ 15k）
+### 小卡（每个槽渲染输出 ≤ 15k）
 
 ```
 <HERMES_HOME>/
@@ -199,12 +196,13 @@ HermesTavern 按渲染后的体积自动选择两种模式之一。阈值是 Her
     └── <name>_<ts>.<ext>            ← 原卡备份
 ```
 
-### 蒸馏模式（SOUL 或 HERMES 渲染后 > 15k）
+### 超大卡（SOUL 或 HERMES 渲染后 > 15k）—— agent 驱动
 
-HermesTavern 会 shell out 调你已配好的 Hermes CLI（默认 `hermes -q`），
-请它把源素材**重新分发**到 8 个 V2 类别（忠于原文措辞——这是
-**编辑工作，不是创作**）。完整的按类别内容落到磁盘；SOUL.md 由几个
-"常驻精选"类别组合而成；HERMES.md 变成类别索引。
+HermesTavern **不会** shell out 到任何独立 LLM。`import` 把源素材
+摆到磁盘上、退出码 2，并提示调用方 agent 把内容分发到 8 个
+V2 类别——忠于原文措辞，遇到与策略冲突的内容可以优雅地跳过。
+agent 写完类别文件之后，跑 `hermes-tavern finalize` 由 CLI 拼出
+最终的 SOUL.md（精选几个常驻类别）和 HERMES.md（类别索引）。
 
 ```
 <HERMES_HOME>/
@@ -214,30 +212,29 @@ HermesTavern 会 shell out 调你已配好的 Hermes CLI（默认 `hermes -q`）
     ├── .active.json
     ├── <name>_<ts>.<ext>            ← 原卡备份
     └── <name>_<ts>/
-        └── extended/                ← V2 类别,内容忠于原作
-            ├── identity.md          ← 名字、年龄、种族、基本信息
-            ├── appearance.md        ← 外貌、体态、声音、特征
-            ├── personality.md       ← 性格、习惯、说话方式、quirks
-            ├── backstory.md         ← 过往、历史、关系
-            ├── scenario.md          ← 对话开场的设定
-            ├── kinks.md             ← 偏好（仅源卡含此内容时生成）
-            ├── roleplay_guides.md   ← 显式角色扮演指引
-            ├── examples.md          ← 示例对话
-            ├── alternate_greetings/01.md, 02.md, ...
-            └── lore/<entry-slug>.md ← 每条 character_book entry
+        ├── source.md                ← CLI 摆给 agent 的输入素材
+        └── extended/                ← V2 类别
+            ├── identity.md          ← 名字、年龄、种族、基本信息          (agent 写)
+            ├── appearance.md        ← 外貌、体态、声音、特征               (agent 写)
+            ├── personality.md       ← 性格、习惯、说话方式                  (agent 写)
+            ├── backstory.md         ← 过往、历史、关系                       (agent 写)
+            ├── scenario.md          ← 对话开场的设定                          (agent 写)
+            ├── kinks.md             ← 偏好（仅源卡含此内容时生成）         (agent 写)
+            ├── roleplay_guides.md   ← 显式角色扮演指引                       (agent 写)
+            ├── examples.md          ← 示例对话                                  (agent 写)
+            ├── alternate_greetings/01.md, 02.md, ...                          (CLI 写)
+            └── lore/<entry-slug>.md ← 每条 character_book entry              (CLI 写)
 ```
 
-空类别会直接跳过不写文件（LLM 要么觉得这个桶没东西可放，要么拒绝处理——
-两种情况都通过 HERMES.md 索引可观察：缺失的文件本身就是信号；这同时
-也是个早期信号，提示当前配置的模型不适合这张卡的内容）。
+空类别会直接跳过不写文件（agent 要么觉得这个桶没东西可放，要么拒绝处理——
+两种情况都通过 HERMES.md 索引可观察：缺失的文件本身就是信号）。
 
 模型在会话开始时只静态读 SOUL.md 和 HERMES.md，之后只在对话需要某些
-细节时才打开对应的 `extended/...md`——所以蒸馏模式下 `cd $HERMES_HOME`
+细节时才打开对应的 `extended/...md`——所以超大卡模式下 `cd $HERMES_HOME`
 更加重要（HERMES.md 是指向各类别文件的索引）。
 
-用 `--no-distill` 关掉蒸馏（让原始的预算超限错误浮出）。
-用 `--distill-cmd "<command>"` 覆盖蒸馏命令。完整管道见
-[`skills/hermes-tavern/references/distillation.md`](skills/hermes-tavern/references/distillation.md)。
+完整流程（含 `finalize` 步骤和失败模式）见
+[`skills/hermes-tavern/references/oversized-cards.md`](skills/hermes-tavern/references/oversized-cards.md)。
 
 ## HermesTavern 写哪些文件——以及哪些它绝不写
 
@@ -272,7 +269,7 @@ HermesTavern 会 shell out 调你已配好的 Hermes CLI（默认 `hermes -q`）
 - [`field-mapping.md`](skills/hermes-tavern/references/field-mapping.md) — V2 → markdown 精确规则
 - [`usage-recipes.md`](skills/hermes-tavern/references/usage-recipes.md) — 常见工作流和坑
 - [`security.md`](skills/hermes-tavern/references/security.md) — 威胁模型 + 消毒层
-- [`distillation.md`](skills/hermes-tavern/references/distillation.md) — 超大卡管道
+- [`oversized-cards.md`](skills/hermes-tavern/references/oversized-cards.md) — 超大卡的 agent 驱动分发流程
 
 **参考文档（cards skill）**
 
@@ -305,8 +302,8 @@ hermes-tavern/
 ## 已知限制
 
 - **不做关键词触发的 lorebook 注入。** 所有 entry 都按 always-on 渲染。
-  这是用保真度换简洁度，在长上下文模型上工作良好；超大 lorebook 走蒸馏，
-  不走门控。
+  这是用保真度换简洁度，在长上下文模型上工作良好；超大 lorebook 走
+  agent 驱动的 extended-files 流程，不走门控。
 - **同一个 Hermes 实例不支持多角色聊天。** 每个角色用独立的
   `HERMES_HOME` 跑。
 - **没有渠道层安全控制。** 这些请在 Hermes 一侧配置（`platform_toolsets`、
@@ -322,12 +319,12 @@ hermes-tavern/
   就没了，HermesTavern 也就解不出来。**解决办法：** 上传前把 PNG 打成 zip
   （`zip aldous.zip aldous.png`），让 IM 当二进制 blob 来传，原始字节就
   不会动。Hermes 拿到 zip 之后解压再导入就行。
-- **超大卡的蒸馏在内容审查严的模型上可能卡很久。**
-  当一张卡超过 15k 阈值，HermesTavern 会 shell out 到 `hermes -q` 做 LLM
-  压缩。如果卡里有成人内容或其他踩内容政策的素材，而底下的 LLM 审查严，
-  这次调用就可能明显变慢（重试、流式吐字慢、硬拒绝），慢到让人以为卡死了。
-  HermesTavern 这边没有干净的修法：给这类卡换一个限制宽松点的模型。
-  懂的都懂。
+- **审查严的 agent 处理超大卡时可能只完成部分类别分发。**
+  当一张卡超过 15k 阈值，HermesTavern 把素材摆到磁盘上，由调用方 agent
+  来分类。如果 agent 受策略限制，可能拒绝写某些类别（比如 `kinks.md`），
+  那些类别就会缺席最终的 HERMES.md 索引——角色还是能加载，只是缺了
+  agent 不愿意保留的部分。想拿到更全的版本，换个模型让 agent 重新跑一遍
+  `source.md`，再 `hermes-tavern finalize` 即可。
 
 ## 开发
 
@@ -337,7 +334,7 @@ python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 
 pytest                    # 跑全套
-pytest -k distill         # 跑子集
+pytest -k staging         # 跑子集
 pytest tests/test_real_cards_smoke.py   # 真实卡 smoke(没卡时自动 skip)
 ```
 
@@ -345,9 +342,9 @@ pytest tests/test_real_cards_smoke.py   # 真实卡 smoke(没卡时自动 skip)
 那个目录被 gitignore——社区卡的 license / 体积 / 内容差异太大无法分发，
 所以只放在本地。
 
-`tests/` 套件覆盖 parse、render、substitute、sanitize、scan、extended、
-distill（mock LLM）、library、CLI、以及端到端 pipeline。保持绿色；
-非 mock 的 subprocess 测试用临时目录里写出来的小 fake `hermes` shell 脚本。
+`tests/` 套件覆盖 parse、render、substitute、sanitize、scan、classify、
+staging、extended、finalize、library、CLI、以及端到端 pipeline。
+保持绿色。
 
 ## 贡献
 

@@ -8,7 +8,12 @@
 #
 # Examples:
 #   ./import_card.sh --card aldous.png --home ~/.hermes-roleplay
-#   ./import_card.sh --card huge.png --home ~/.hermes-roleplay --no-distill
+#   ./import_card.sh --card aldous.png --home ~/.hermes-roleplay --trust-system-prompt
+#
+# Oversized cards exit with code 2 and stage source.md for the agent;
+# the agent then writes extended/<category>.md files and the user runs
+#   hermes-tavern finalize --card <name> --home <home>
+# to assemble SOUL.md and HERMES.md. See SKILL.md "Oversized card procedure".
 
 set -euo pipefail
 
