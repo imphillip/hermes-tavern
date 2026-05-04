@@ -124,34 +124,47 @@ def build_prompt(
     lore_target: int,
 ) -> str:
     lore_section = lore if lore else "(no lorebook in this card)"
-    return f"""You are helping convert a SillyTavern character card into compact
-context files for a Hermes agent. The rendered files below exceed the
-agent's static-context budget. Compress them so they fit comfortably
-while preserving what defines the character.
+    return f"""You are shrinking a SillyTavern character card down to fit a Hermes
+agent's always-on context slot. The two rendered files below exceed
+the budget; output trimmed versions that fit, **using the source's
+own wording wherever possible**.
 
-Hard limits:
+This is editorial work, not creative writing.
+
+Hard rules:
+
+- **Preserve the source's wording.** If a sentence already says it,
+  reuse the sentence. Do not paraphrase into a "smoother" version,
+  do not invent new framing, do not rewrite for tone.
+- **Do not narrate in italics or novelistic prose.** No `*she leaned
+  closer*`, no purple description, no third-person scene-painting.
+  The source provides the voice; you are only choosing what to keep.
+- **If the source has labeled fields** (e.g. `Full Name: ...`,
+  `Appearance: ...`, `Personality: ...`), preserve those labels and
+  the structure they imply. Don't merge labeled fields into one
+  paragraph.
+- **Cut by removing redundancy, not by reframing.** Drop duplicate
+  alternate greetings, repeated descriptions of the same trait,
+  encyclopedic world filler. Keep the lines that are actually
+  load-bearing for who this character is.
+- **The full original is preserved on disk for retrieval.** You are
+  not "saving" content by including more of it here — anything you
+  cut is still available via the extended/ files indexed in HERMES.md.
+
+Hard limits (after trimming):
+
 - SOUL.md: {soul_target} characters maximum
-- HERMES lore: {lore_target} characters maximum (or omit entirely if no
+- HERMES lore: {lore_target} characters maximum (or `NONE` if no
   world content is worth retaining as always-on context)
 
-Preserve: name, core identity (who they are in 2-3 paragraphs), key
-personality traits, signature voice, the canonical opening line,
-critical relationships, and the 1-3 most important lorebook entries.
-
-Cut: verbose physical description, redundant alternate greetings,
-lengthy dialogue examples, encyclopedic world detail. The full original
-text is preserved on disk for retrieval; this is only the always-on
-core.
-
 Reply with **exactly** the following XML structure and nothing else.
-Both tags must appear; use <lore>NONE</lore> if you decide no world
-content is worth retaining:
+Both tags must appear; use `<lore>NONE</lore>` if you keep no lore:
 
 <soul>
-...compressed SOUL.md content here, including the H1 with the character's name...
+...trimmed SOUL.md content here, including the H1 with the character's name...
 </soul>
 <lore>
-...compressed always-on lore here, or NONE...
+...trimmed always-on lore here, or NONE...
 </lore>
 
 Character name: {char_name}

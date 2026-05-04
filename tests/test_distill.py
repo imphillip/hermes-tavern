@@ -56,6 +56,31 @@ def test_build_prompt_includes_caps_and_card_name():
     assert "<lore>" in prompt and "</lore>" in prompt
 
 
+def test_build_prompt_demands_faithful_preservation():
+    """v0.4: distillation prompt must explicitly require source-wording
+    preservation and forbid italic/novelistic rewriting — without these
+    cues the model defaults to creative summarization (e.g. heavy
+    italic prose), which then bleeds into chat-time output style."""
+    prompt = build_prompt(
+        soul="SOUL", lore=None, char_name="X",
+        soul_target=12_000, lore_target=12_000,
+    )
+    lower = prompt.lower()
+    # Source-fidelity instructions
+    assert "source's own wording" in lower or "preserve the source's wording" in lower
+    assert "do not paraphrase" in lower
+    # Anti-italic / anti-novelistic guard
+    assert "italic" in lower
+    assert "novelistic" in lower
+    # Editorial framing (cut redundancy, not rewrite)
+    assert "editorial work" in lower or "not creative writing" in lower
+    # Subheader-preservation hint for description-stuffed cards
+    assert "labeled fields" in lower
+    # The "extended/ files preserve the original" reassurance, so the
+    # model doesn't over-include trying to "save" content
+    assert "extended/" in prompt
+
+
 def test_parse_response_extracts_blocks():
     text = """
 <soul>
