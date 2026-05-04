@@ -1,14 +1,13 @@
 ---
 name: hermes-tavern
-description: "Import a SillyTavern V2 character card (.png/.json/.yaml) into Hermes-Agent as SOUL.md + HERMES.md. Channel-agnostic — affects every gateway."
-version: 0.4.5
+description: "Import and manage SillyTavern V2 character cards (.png/.json/.yaml) for Hermes-Agent. Imports write SOUL.md + HERMES.md; the same skill also handles list / current / switch / delete / restore / history / revert. Channel-agnostic — affects every gateway."
+version: 0.5.0
 author: HermesTavern contributors
 license: MIT
 metadata:
   hermes:
-    tags: [Roleplay, CharacterCard, SillyTavern, SOUL, Persona, TavernAI]
+    tags: [Roleplay, CharacterCard, SillyTavern, SOUL, Persona, Library, TavernAI]
     homepage: https://github.com/imphillip/hermes-tavern
-    related_skills: [hermes-tavern-cards]
 prerequisites:
   commands: [python]
   python:
@@ -16,26 +15,32 @@ prerequisites:
     packages: [pillow, pyyaml, jinja2]
 ---
 
-# HermesTavern (loader)
+# HermesTavern
 
 ## When to use
 
-Trigger this skill when the user wants to **bring a SillyTavern character into
-Hermes**. Concrete signals:
+Trigger this skill whenever the user wants to **bring a SillyTavern character
+into Hermes** *or* **manage characters already imported**. Concrete signals:
 
-- mentions of "import character card", "load SillyTavern card", "set up
-  roleplay persona", "TavernAI character", "chub.ai card"
+**Import / load:**
+- "import character card", "load SillyTavern card", "set up roleplay persona",
+  "TavernAI character", "chub.ai card"
 - the user provides a `.png`, `.json`, or `.yaml` character card path
-- the user asks Hermes to "be" / "play" a character whose card they have
-  on disk
+- the user asks Hermes to "be" / "play" a character whose card they have on disk
+
+**Library management:**
+- "switch character to X", "play X instead", "be Alice now"
+- "what character am I running right now?", "who is loaded?"
+- "list my characters", "show all imported cards"
+- "delete the X card", "remove the Bob persona"
+- "bring back the card I deleted", "undelete X", "restore the previous one"
+- "go back to before I loaded any card", "revert to the previous SOUL",
+  "show me the snapshot history"
 
 This skill is **channel-agnostic**. The persona it writes is loaded by
 Hermes itself at startup, so it applies uniformly across every channel the
 user has configured (CLI, email, Telegram, Discord, Slack, …). Do not touch
 channel configuration here — that lives on the Hermes side.
-
-For *managing* already-imported cards (list / switch / delete / restore),
-use the sibling skill `hermes-tavern-cards`.
 
 ## What it does
 
@@ -108,6 +113,59 @@ hermes-tavern validate --card aldous.png
 # instead of inside untrusted blockquotes. Only for trusted card authors.
 hermes-tavern import --card aldous.png --home ~/.hermes-roleplay --trust-system-prompt
 ```
+
+## Library management
+
+Once cards are imported, the same CLI handles list / current / switch /
+delete / restore over `<HERMES_HOME>/cards/`. None of these reach outside
+that directory; switching writes a fresh SOUL.md + HERMES.md from a card
+already in the library.
+
+```bash
+# What's loaded right now?
+hermes-tavern current --home ~/.hermes-roleplay
+
+# What cards do I have?
+hermes-tavern list --home ~/.hermes-roleplay
+hermes-tavern list --home ~/.hermes-roleplay --all     # include trash
+
+# Switch active persona
+hermes-tavern switch --card alice --home ~/.hermes-roleplay
+
+# Soft-delete a card (moves to cards/.trash/)
+hermes-tavern delete --card bob --home ~/.hermes-roleplay
+
+# Bring it back
+hermes-tavern restore --card bob --home ~/.hermes-roleplay
+
+# SOUL.md / HERMES.md snapshot history (every import/switch is captured)
+hermes-tavern history --home ~/.hermes-roleplay
+
+# Revert SOUL.md / HERMES.md to a snapshot
+hermes-tavern revert --home ~/.hermes-roleplay --to pristine    # back to before any card
+hermes-tavern revert --home ~/.hermes-roleplay --to alice       # back to when alice was active
+hermes-tavern revert --home ~/.hermes-roleplay --to 0003        # back to snapshot 0003
+hermes-tavern revert --home ~/.hermes-roleplay --previous       # one snapshot back
+```
+
+For `switch` / `delete` / `restore`, the `--card` argument is matched in
+this order: exact filename → case-insensitive filename stem →
+case-insensitive parsed `data.name` → case-insensitive prefix on either.
+Ambiguous queries refuse and list the candidates.
+
+`switch` always overwrites `SOUL.md` / `HERMES.md` (that is its whole
+point). `delete` never touches `SOUL.md` itself — if the user deletes the
+active card and wants the persona gone too, they should `switch` to a
+different card or `revert` to a snapshot.
+
+`switch` to an oversized card whose `extended/` is already populated from
+a prior `finalize` reuses those files — no agent re-engagement needed.
+If `extended/` was deleted, `switch` falls back to the staging path and
+prompts for the agent procedure again.
+
+Full library layout (`.active.json` schema, snapshot directory, trash
+behavior, `--card` resolution rules) is in
+`references/library-layout.md`.
 
 ## Oversized card procedure
 
@@ -243,6 +301,7 @@ See `references/security.md` for the full threat model and what is
 - `references/usage-recipes.md` — common workflows and gotchas
 - `references/security.md` — threat model, sanitiser layers, operator workflow
 - `references/oversized-cards.md` — agent-driven categorization flow, file layout, failure modes
+- `references/library-layout.md` — `<HERMES_HOME>/cards/` schema, snapshots, `--card` resolution
 
 ## Files this skill writes
 

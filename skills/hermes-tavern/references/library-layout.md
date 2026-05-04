@@ -1,7 +1,8 @@
 # `<HERMES_HOME>/cards/` library layout
 
-The cards manager skill operates entirely on this directory. It is created
-the first time `hermes-tavern import` runs.
+The library is created the first time `hermes-tavern import` runs.
+All `list` / `current` / `switch` / `delete` / `restore` / `history` /
+`revert` commands operate inside this directory.
 
 **Small cards** (rendered output ≤ 15k per slot):
 
@@ -41,8 +42,8 @@ SOUL.md and indexed HERMES.md):
 `AGENTS.md` is intentionally never written — Hermes loads it only when
 HERMES.md is absent, so the references would never reach the model.
 The oversized-card flow merges the index into `HERMES.md`. See
-`../hermes-tavern/references/oversized-cards.md` for the full rationale,
-the agent procedure, and failure modes.
+`oversized-cards.md` for the full rationale, the agent procedure, and
+failure modes.
 
 ## Launch posture
 

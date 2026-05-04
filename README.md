@@ -77,7 +77,7 @@ If your Hermes is set up with the hub `tap` system:
 
 ```bash
 hermes skills tap add imphillip/hermes-tavern
-hermes skills install hermes-tavern hermes-tavern-cards
+hermes skills install hermes-tavern
 ```
 
 ### Bootstrap: installing the CLI on the host
@@ -272,27 +272,21 @@ nothing leaks elsewhere.
 
 ## Documentation
 
-The two skills are self-documenting; their `SKILL.md` and
-`references/` directories contain the full operator-facing docs.
-
-**Skills**
+The skill is self-documenting; its `SKILL.md` and `references/`
+directory contain the full operator-facing docs.
 
 - [`skills/hermes-tavern/SKILL.md`](skills/hermes-tavern/SKILL.md) —
-  import & validate
-- [`skills/hermes-tavern-cards/SKILL.md`](skills/hermes-tavern-cards/SKILL.md) —
-  list / current / switch / delete / restore
+  import + library management (list / current / switch / delete /
+  restore / history / revert) in one place
 
-**Reference docs (loader skill)**
+**Reference docs**
 
 - [`v2-spec-summary.md`](skills/hermes-tavern/references/v2-spec-summary.md) — V2 card field cheat sheet
 - [`field-mapping.md`](skills/hermes-tavern/references/field-mapping.md) — exact V2 → markdown rules
 - [`usage-recipes.md`](skills/hermes-tavern/references/usage-recipes.md) — common workflows and gotchas
 - [`security.md`](skills/hermes-tavern/references/security.md) — threat model + sanitiser layers
 - [`oversized-cards.md`](skills/hermes-tavern/references/oversized-cards.md) — agent-driven categorization flow for oversized cards
-
-**Reference docs (cards skill)**
-
-- [`library-layout.md`](skills/hermes-tavern-cards/references/library-layout.md) — `<HERMES_HOME>/cards/` schema, `--card` resolution
+- [`library-layout.md`](skills/hermes-tavern/references/library-layout.md) — `<HERMES_HOME>/cards/` schema, snapshot history, `--card` resolution
 
 ## Repository layout
 
@@ -302,16 +296,19 @@ hermes-tavern/
 ├── tests/                         pytest suite (incl. real-card smoke)
 ├── examples/                      local third-party cards (gitignored)
 └── skills/                        Hermes-hub-discoverable skills tree
-    ├── hermes-tavern/             Skill 1: import & validate
-    │   ├── SKILL.md
-    │   ├── references/            5 reference docs
-    │   ├── scripts/               skill entry wrappers + install.sh
-    │   └── assets/                bundled wheel + sample V2 card
-    └── hermes-tavern-cards/       Skill 2: library management (depends on hermes-tavern)
+    └── hermes-tavern/             one skill: import + library management
         ├── SKILL.md
-        ├── references/            library-layout doc
-        └── scripts/               skill entry wrappers
+        ├── references/            6 reference docs
+        ├── scripts/               skill entry wrappers + install.sh
+        └── assets/                bundled wheel + sample V2 card
 ```
+
+> **v0.5.0 note.** Earlier versions shipped a separate
+> `hermes-tavern-cards` skill for management. It's been merged into
+> `hermes-tavern` so users only install one skill and Hermes only has
+> one trigger surface to route. If your `hermes skills list` still
+> shows `hermes-tavern-cards`, run `hermes skills uninstall
+> hermes-tavern-cards`.
 
 The `skills/` subdirectory matches the `path: "skills/"` convention
 used by `openai/skills` and `anthropics/skills`, so

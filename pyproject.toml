@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "hermes-tavern"
-version = "0.4.5"
+version = "0.5.0"
 description = "Import SillyTavern V2 character cards into Hermes-Agent as SOUL.md + HERMES.md."
 readme = "README.md"
 license = { text = "MIT" }
