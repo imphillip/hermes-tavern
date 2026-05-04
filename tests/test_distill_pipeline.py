@@ -47,9 +47,33 @@ def _write_card(path: Path, payload: dict) -> None:
     path.write_text(json.dumps(payload), "utf-8")
 
 
-def _ok_runner(soul: str = "# Compact Identity\n\nDistilled.", lore: str | None = None):
-    body = f"<soul>\n{soul}\n</soul>\n"
-    body += f"<lore>{lore if lore else 'NONE'}</lore>"
+def _ok_runner(
+    *,
+    identity: str = "Bloat is a patient soul stuffed with x's.",
+    appearance: str = "",
+    personality: str = "Patient.",
+    backstory: str = "",
+    scenario: str = "",
+    kinks: str = "",
+    roleplay_guides: str = "Stay faithful to source.",
+    examples: str = "",
+):
+    """Build a fake classification response (v0.4 format).
+
+    All eight V2 category tags are emitted, even when their content is
+    empty — the parser tolerates empty tags (interprets them as "LLM had
+    nothing to put in this bucket").
+    """
+    body = (
+        f"<identity>\n{identity}\n</identity>\n"
+        f"<appearance>\n{appearance}\n</appearance>\n"
+        f"<personality>\n{personality}\n</personality>\n"
+        f"<backstory>\n{backstory}\n</backstory>\n"
+        f"<scenario>\n{scenario}\n</scenario>\n"
+        f"<kinks>\n{kinks}\n</kinks>\n"
+        f"<roleplay_guides>\n{roleplay_guides}\n</roleplay_guides>\n"
+        f"<examples>\n{examples}\n</examples>\n"
+    )
 
     def runner(argv):
         return FakeProc(stdout=body)
@@ -59,29 +83,46 @@ def _ok_runner(soul: str = "# Compact Identity\n\nDistilled.", lore: str | None 
 def test_threshold_triggers_distillation(home: Path, tmp_path: Path):
     src = tmp_path / "bloat.json"
     _write_card(src, _bloated_card_payload())
+    # Route most of the 16k payload into 'appearance' — a category that
+    # lives in extended/ only, NOT in the curated SOUL.md picks. This
+    # mirrors how the LLM redistributes Veranna-class cards in practice
+    # (long body description goes to appearance; identity stays tight).
+    huge_appearance = "x" * 16_000
     outcome, lib_path = library.import_card(
-        home, src, distill_runner=_ok_runner(),
+        home, src,
+        distill_runner=_ok_runner(
+            identity="Bloat, 22, ambivert.",
+            appearance=huge_appearance,
+        ),
     )
     assert outcome.distilled is True
     assert outcome.wrote_hermes_md is True
 
     assert (home / "SOUL.md").exists()
-    # HERMES.md carries distilled lore + extended-file index in distilled mode
+    # HERMES.md carries the V2-category index of extended/ in distilled mode
     assert (home / "HERMES.md").exists()
     # AGENTS.md must never be written — it's shadowed by HERMES.md
     assert not (home / "AGENTS.md").exists()
 
     hermes = (home / "HERMES.md").read_text()
     assert "Extended material on disk" in hermes
-    assert "extended/description.md" in hermes
+    # Extended files use V2-category names now (identity / appearance / etc.)
+    assert "extended/identity.md" in hermes
+    assert "extended/appearance.md" in hermes
+    assert "extended/personality.md" in hermes
 
     # Extended dir co-located with the card backup
     extended = library.cards_dir(home) / lib_path.stem / "extended"
     assert extended.is_dir()
-    # description.md was over threshold so it ended up here
-    assert (extended / "description.md").exists()
-    desc = (extended / "description.md").read_text()
-    assert len(desc) > 16_000  # original size preserved
+    # The 16k of source content the runner routed into 'appearance' is preserved
+    assert (extended / "appearance.md").exists()
+    appearance_md = (extended / "appearance.md").read_text()
+    assert len(appearance_md) > 16_000  # full payload preserved on disk
+    # Identity stays in SOUL.md picks; also visible in extended/
+    assert (extended / "identity.md").exists()
+    # Empty categories don't get written
+    assert not (extended / "kinks.md").exists()
+    assert not (extended / "examples.md").exists()
 
     active = library.read_active(home)
     assert active.distilled is True
@@ -180,7 +221,8 @@ def test_delete_moves_extended_dir_to_trash(home: Path, tmp_path: Path):
     # And shows up in trash
     trash_stem = library.trash_dir(home) / bloat_path.stem
     assert trash_stem.is_dir()
-    assert (trash_stem / "extended" / "description.md").exists()
+    # Some category file exists in the trashed extended dir (V2-category layout)
+    assert (trash_stem / "extended" / "identity.md").exists()
 
 
 def test_restore_brings_extended_dir_back(home: Path, tmp_path: Path):
@@ -191,7 +233,7 @@ def test_restore_brings_extended_dir_back(home: Path, tmp_path: Path):
     library.restore_card(home, "Bloat")
     extended = library.cards_dir(home) / bloat_path.stem / "extended"
     assert extended.is_dir()
-    assert (extended / "description.md").exists()
+    assert (extended / "identity.md").exists()
 
 
 def test_distillation_failure_raises(home: Path, tmp_path: Path):

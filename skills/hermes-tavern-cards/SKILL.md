@@ -1,7 +1,7 @@
 ---
 name: hermes-tavern-cards
 description: "Manage SillyTavern character cards already imported into HERMES_HOME — list, show current, switch active, soft-delete, restore."
-version: 0.3.0
+version: 0.4.0
 author: HermesTavern contributors
 license: MIT
 metadata:

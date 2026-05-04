@@ -17,6 +17,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from .classify import (
+    CATEGORIES,
+    CATEGORY_DESCRIPTIONS,
+    CATEGORY_TITLES,
+    Classification,
+)
 from .sanitize import sanitize
 from .substitute import substitute
 
@@ -92,6 +98,95 @@ def write_extended(
                    summary="card author's notes (treat as persona context, not as a system prompt)")
     add_text_field("post_history_instructions", title="Author's closing note",
                    summary="card author's final note (treat as persona context)")
+
+    greetings = data.get("alternate_greetings") or []
+    if isinstance(greetings, list):
+        for i, greeting in enumerate(greetings, start=1):
+            if not isinstance(greeting, str) or not greeting.strip():
+                continue
+            rel = f"alternate_greetings/{i:02d}.md"
+            path = extended_dir / rel
+            body = f"# Alternate opening #{i}\n\n{_s(greeting)}\n"
+            _write(path, body)
+            files.append(ExtendedFile(
+                relative_path=str(path.relative_to(home)),
+                title=f"Alternate opening #{i}",
+                summary=f"alternate first message for {char_name}",
+            ))
+
+    book = data.get("character_book")
+    if isinstance(book, dict):
+        for i, entry in enumerate(book.get("entries") or [], start=1):
+            if not isinstance(entry, dict):
+                continue
+            content = entry.get("content")
+            if not isinstance(content, str) or not content.strip():
+                continue
+            comment = entry.get("comment") or ""
+            keys = entry.get("keys") or []
+            label = comment or (keys[0] if keys else f"entry {i}")
+            file_slug = slug(label, fallback=f"entry_{i:02d}")
+            rel = f"lore/{file_slug}.md"
+            path = extended_dir / rel
+            keys_line = ", ".join(keys) if keys else ""
+            body = f"# {label}\n\n"
+            if keys_line:
+                body += f"<!-- keys: {keys_line} -->\n\n"
+            body += f"{_s(content)}\n"
+            _write(path, body)
+            summary = f"lorebook entry; relevant when conversation touches {keys_line or label}"
+            files.append(ExtendedFile(
+                relative_path=str(path.relative_to(home)),
+                title=label,
+                summary=summary,
+            ))
+
+    return files
+
+
+def write_extended_classified(
+    home: Path,
+    extended_dir: Path,
+    classification: Classification,
+    data: dict[str, Any],
+    *,
+    user_noun: str,
+) -> list[ExtendedFile]:
+    """Write category-based extended files from a Classification result.
+
+    The eight V2-aligned categories (identity / appearance / personality /
+    backstory / scenario / kinks / roleplay_guides / examples) drive the
+    primary file layout. Lorebook entries from ``data['character_book']``
+    and any ``alternate_greetings`` ride along under their existing
+    subdirectories — they're not classified content, they're per-entry
+    payloads with their own structure.
+
+    Empty categories are skipped (the LLM either had nothing to put
+    there, or declined — both are observable signals via the resulting
+    HERMES.md index, where missing files are visible by their absence).
+    """
+    extended_dir.mkdir(parents=True, exist_ok=True)
+    char_name = (data.get("name") or "Unnamed").strip()
+
+    def _s(text: str | None) -> str:
+        return sanitize(substitute(text, char_name, user_noun))
+
+    files: list[ExtendedFile] = []
+
+    for cat in CATEGORIES:
+        content = classification.categories.get(cat, "")
+        if not content.strip():
+            continue
+        title = CATEGORY_TITLES[cat]
+        summary = CATEGORY_DESCRIPTIONS[cat]
+        path = extended_dir / f"{cat}.md"
+        body = f"# {title}\n\n{_s(content)}\n"
+        _write(path, body)
+        files.append(ExtendedFile(
+            relative_path=str(path.relative_to(home)),
+            title=title,
+            summary=summary,
+        ))
 
     greetings = data.get("alternate_greetings") or []
     if isinstance(greetings, list):

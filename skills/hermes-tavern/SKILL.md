@@ -1,7 +1,7 @@
 ---
 name: hermes-tavern
 description: "Import a SillyTavern V2 character card (.png/.json/.yaml) into Hermes-Agent as SOUL.md + HERMES.md. Channel-agnostic — affects every gateway."
-version: 0.3.0
+version: 0.4.0
 author: HermesTavern contributors
 license: MIT
 metadata:

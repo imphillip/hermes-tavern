@@ -214,34 +214,43 @@ size. The threshold is 75% of the Hermes 20k slot — i.e. 15,000 chars
 ### Distillation mode (rendered SOUL or HERMES > 15k)
 
 HermesTavern shells out to your already-configured Hermes CLI (default
-`hermes -q`) for a one-shot LLM compression of the rendered output,
-then lays the **full original** content per-field on disk for runtime
-retrieval by the model.
+`hermes -q`) and asks it to **redistribute** the source material into
+eight V2-aligned categories (faithful to original wording — this is
+editorial work, not creative rewriting). The full per-category content
+lands on disk; SOUL.md is composed from a small set of always-on
+picks; HERMES.md becomes the category index.
 
 ```
 <HERMES_HOME>/
-├── SOUL.md                          ← LLM-distilled persona (compact)
-├── HERMES.md                        ← distilled lore + extended-file index
+├── SOUL.md                          ← curated picks: identity + personality + roleplay_guides
+├── HERMES.md                        ← Director's notes + V2-category index
 └── cards/
     ├── .active.json
     ├── <name>_<ts>.<ext>            ← original card backup
     └── <name>_<ts>/
-        └── extended/                ← full original content, per-field
-            ├── description.md
-            ├── personality.md
-            ├── scenario.md
-            ├── first_mes.md
-            ├── mes_example.md
-            ├── system_prompt.md
-            ├── post_history_instructions.md
+        └── extended/                ← V2-aligned categories, faithful content
+            ├── identity.md          ← name, age, ethnicity, basic facts
+            ├── appearance.md        ← physical description, voice, distinctive features
+            ├── personality.md       ← traits, mannerisms, speech style, quirks
+            ├── backstory.md         ← past events, history, relationships
+            ├── scenario.md          ← the situation the conversation opens in
+            ├── kinks.md             ← preferences (only if present in source)
+            ├── roleplay_guides.md   ← explicit portrayal instructions
+            ├── examples.md          ← sample dialogue patterns
             ├── alternate_greetings/01.md, 02.md, ...
-            └── lore/<entry-slug>.md
+            └── lore/<entry-slug>.md ← per character_book entry
 ```
+
+Empty categories are simply omitted (the LLM either had nothing to put
+in that bucket, or declined — both are observable signals via the
+HERMES.md index where missing files are visible by their absence; this
+also doubles as an early signal that the configured model isn't a good
+fit for this card's content).
 
 The model reads SOUL.md and HERMES.md statically at session start, then
 opens specific `extended/...md` files only when the conversation calls
 for those details — that's why `cd $HERMES_HOME` matters even more
-here (HERMES.md is the index that points at the per-field files).
+here (HERMES.md is the index that points at the per-category files).
 
 Opt out of distillation with `--no-distill` (surfaces the original
 budget error). Override the distillation command with

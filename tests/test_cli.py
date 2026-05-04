@@ -159,13 +159,21 @@ def test_no_distill_flag_surfaces_budget_error(tmp_path: Path, capsys):
 
 
 def test_distill_via_fake_command(tmp_path: Path, capsys):
-    """Use a fake `hermes` command (a tiny Python one-liner) to verify the
-    distillation shell-out path end-to-end without depending on real hermes."""
+    """Use a fake `hermes` command (a tiny shell script) to verify the
+    classification shell-out path end-to-end without depending on real
+    hermes. v0.4 format: 8 V2 category tags."""
     home = tmp_path / "home"
     fake_hermes = tmp_path / "fake-hermes.sh"
     fake_hermes.write_text(
         "#!/bin/sh\n"
-        "printf '<soul>\\n# Compact\\n\\nDistilled body.\\n</soul>\\n<lore>NONE</lore>\\n'\n"
+        "printf '<identity>\\nBig is a stoic monolith.\\n</identity>\\n"
+        "<appearance></appearance>\\n"
+        "<personality>\\nReserved.\\n</personality>\\n"
+        "<backstory></backstory>\\n"
+        "<scenario></scenario>\\n"
+        "<kinks></kinks>\\n"
+        "<roleplay_guides>\\nStay faithful.\\n</roleplay_guides>\\n"
+        "<examples></examples>\\n'\n"
     )
     fake_hermes.chmod(0o755)
 
@@ -182,8 +190,10 @@ def test_distill_via_fake_command(tmp_path: Path, capsys):
     )
     assert rc == 0
     soul = (home / "SOUL.md").read_text()
-    assert "# Compact" in soul
-    assert "Distilled body." in soul
+    # Curated SOUL.md picks identity + personality + roleplay_guides
+    assert "Big is a stoic monolith." in soul
+    assert "Reserved." in soul
+    assert "Stay faithful." in soul
     # Distilled mode: HERMES.md carries the index, AGENTS.md is never written
     assert (home / "HERMES.md").exists()
     assert "Extended material on disk" in (home / "HERMES.md").read_text()

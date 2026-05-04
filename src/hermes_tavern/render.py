@@ -125,6 +125,45 @@ def render(
     return RenderResult(soul=soul, hermes=hermes_text, truncated_entries=truncated)
 
 
+def render_curated_soul(
+    char_name: str,
+    classification: "Classification",
+    *,
+    user_noun: str = "the visitor",
+    enforce_budget: bool = True,
+) -> str:
+    """Render the curated SOUL.md from a Classification result.
+
+    Used in distillation mode: the always-on persona file is built from
+    a small subset of categories (identity + personality +
+    roleplay_guides). Other categories live in extended/ and are reached
+    via the HERMES.md index.
+
+    Raises ``BudgetExceededError`` (when ``enforce_budget``) if the
+    rendered curated SOUL exceeds the hard cap — caller can fall back
+    to a follow-up compression call in that case.
+    """
+    from .classify import SOUL_PICKS  # local import to avoid module-cycle at top
+    env = _env(char_name, user_noun)
+    picks = {cat: classification.categories.get(cat, "") for cat in SOUL_PICKS}
+    soul = env.get_template("SOUL.md.curated.j2").render(
+        data={"name": char_name},
+        user_noun=user_noun,
+        picks=picks,
+    )
+    soul = _collapse_blank_lines(soul)
+    if enforce_budget and len(soul) > SOUL_BUDGET:
+        raise BudgetExceededError("curated SOUL.md", len(soul), SOUL_BUDGET)
+    return soul
+
+
+# Forward declaration so the type hint above resolves without forcing an
+# import-time dependency cycle (classify imports from distill, extended
+# imports from classify, render imports from neither at module top).
+if False:  # pragma: no cover
+    from .classify import Classification  # noqa: F401
+
+
 def _render_hermes(
     env: Environment,
     book: dict[str, Any],

@@ -45,8 +45,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from . import classify as classify_mod
 from . import distill as distill_mod
 from . import extended as extended_mod
+from . import render as render_mod
 from . import snapshots as snap_mod
 from .parse import load_card
 from .render import SOUL_BUDGET, BudgetExceededError, RenderResult, render
@@ -408,10 +410,10 @@ def apply_card(
         )
         return ApplyOutcome(rendered=rendered, wrote_hermes_md=wrote_hermes, distilled=False)
 
-    # Distillation path.
-    distilled = distill_mod.distill(
-        rendered.soul,
-        rendered.hermes,
+    # Distillation path: V2 semantic classification → category-based
+    # extended/ files → curated SOUL.md from picks, indexed HERMES.md.
+    classification = classify_mod.classify(
+        data,
         char_name=char_name,
         command=distill_command,
         runner=distill_runner,
@@ -421,10 +423,17 @@ def apply_card(
     # Replace any prior extended/ dir for this same card.
     if extended_dir.exists():
         shutil.rmtree(extended_dir)
-    files = extended_mod.write_extended(home, extended_dir, data, user_noun=user_noun)
-    hermes_md = extended_mod.render_distilled_hermes_md(char_name, distilled.lore, files)
+    files = extended_mod.write_extended_classified(
+        home, extended_dir, classification, data, user_noun=user_noun
+    )
+    soul_md = render_mod.render_curated_soul(
+        char_name, classification, user_noun=user_noun
+    )
+    hermes_md = extended_mod.render_distilled_hermes_md(
+        char_name, distilled_lore=None, extended=files
+    )
 
-    _write_outputs_distilled(home, soul=distilled.soul, hermes=hermes_md, overwrite=overwrite)
+    _write_outputs_distilled(home, soul=soul_md, hermes=hermes_md, overwrite=overwrite)
 
     record = ActiveRecord(
         name=char_name,
@@ -451,8 +460,8 @@ def apply_card(
         rendered=rendered,
         wrote_hermes_md=True,
         distilled=True,
-        distilled_soul_size=len(distilled.soul),
-        distilled_lore_size=len(distilled.lore) if distilled.lore else None,
+        distilled_soul_size=len(soul_md),
+        distilled_lore_size=None,  # no separate lore distillation in v0.4
         extended_files=len(files),
     )
 
