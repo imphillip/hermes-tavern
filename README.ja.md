@@ -95,6 +95,21 @@ venv + `~/.local/bin` shim、の順に試行します。`HERMES_TAVERN_VENV` /
 されたら、これは `pipx install hermes-tavern` に置き換わり、
 同梱 wheel もなくなります。
 
+### アンインストール
+
+skill(プロンプトファイル)と CLI(システムバイナリ)は別レイヤーです。
+hub のコマンドは前者だけを扱います:
+
+```bash
+bash skills/hermes-tavern/scripts/uninstall.sh   # CLI を削除; --dry-run でプレビュー
+hermes skills uninstall hermes-tavern            # skill を削除
+```
+
+アンインストーラは pipx / uv tool / 専用 venv を自動判別し、
+任意のパスは触りません。また `<HERMES_HOME>/` 内のデータ
+(カードライブラリ、SOUL.md、スナップショット —— これらは個人
+コンテンツであり、インストール成果物ではありません)も保持します。
+
 ### 必要環境
 
 - Python ≥ 3.10

@@ -1,7 +1,7 @@
 ---
 name: hermes-tavern
 description: "Import and manage SillyTavern V2 character cards (.png/.json/.yaml) for Hermes-Agent. Imports write SOUL.md + HERMES.md; the same skill also handles list / current / switch / delete / restore / history / revert. Channel-agnostic — affects every gateway."
-version: 0.5.0
+version: 0.5.1
 author: HermesTavern contributors
 license: MIT
 metadata:
@@ -78,6 +78,36 @@ The installer tries, in order: `pipx` → `uv tool` → a dedicated venv at
 idempotent: if `hermes-tavern` is already on PATH, it exits without
 touching anything. Override paths with `HERMES_TAVERN_VENV` and
 `HERMES_TAVERN_BIN` env vars.
+
+## Uninstall
+
+Removing the skill folder (or `hermes skills uninstall hermes-tavern`)
+only clears the skill layer; the `hermes-tavern` CLI is installed in
+the host system. Two-step uninstall:
+
+```bash
+# 1. Remove the CLI (auto-detects pipx / uv tool / dedicated venv)
+bash scripts/uninstall.sh
+# preview without executing:
+bash scripts/uninstall.sh --dry-run
+
+# 2. Remove the skill itself
+hermes skills uninstall hermes-tavern        # if installed via hub
+# or rm the skill folder by hand if dropped in via zip
+```
+
+The uninstaller is safe by design:
+
+- It **never touches user data** in `<HERMES_HOME>/` (your card library,
+  SOUL.md / HERMES.md, snapshots are personal content, not install
+  artifacts — preserve them, or `rm -rf` by hand if you really want to
+  start over).
+- It **only removes paths matching the layout `install.sh` uses**
+  (pipx-managed, uv-managed, or the conventional venv at
+  `~/.local/share/hermes-tavern-venv` with shim at
+  `~/.local/bin/hermes-tavern`). If the CLI lives somewhere else
+  (e.g. an editable dev install), the script refuses and prints the
+  path so you can clean it up by hand.
 
 ## Quick start
 

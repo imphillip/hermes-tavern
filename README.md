@@ -97,6 +97,21 @@ Override with `HERMES_TAVERN_VENV` / `HERMES_TAVERN_BIN`. When
 `hermes-tavern` lands on PyPI, this collapses to
 `pipx install hermes-tavern` and the bundled wheels go away.
 
+### Uninstall
+
+Two layers — the skill (prompt files) and the CLI (system binary). The
+hub command only handles the first:
+
+```bash
+bash skills/hermes-tavern/scripts/uninstall.sh   # removes the CLI; --dry-run to preview
+hermes skills uninstall hermes-tavern            # removes the skill
+```
+
+The uninstaller auto-detects pipx / uv tool / dedicated venv, refuses
+to nuke arbitrary paths, and never touches your `<HERMES_HOME>/`
+data (cards, SOUL.md, snapshots — those are personal content, not
+install artifacts).
+
 ### Requirements
 
 - Python ≥ 3.10

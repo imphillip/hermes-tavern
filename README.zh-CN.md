@@ -93,6 +93,20 @@ bash skills/hermes-tavern/scripts/install.sh
 `HERMES_TAVERN_BIN` 覆盖路径。等 `hermes-tavern` 上 PyPI 之后，
 这一段会简化为 `pipx install hermes-tavern`，捆绑的 wheel 也就可以删掉了。
 
+### 卸载
+
+两层东西要分别清——skill（提示词）和 CLI（系统二进制）。hub 命令只
+管前者：
+
+```bash
+bash skills/hermes-tavern/scripts/uninstall.sh   # 移除 CLI；--dry-run 先预览
+hermes skills uninstall hermes-tavern            # 移除 skill
+```
+
+卸载脚本自动识别 pipx / uv tool / 专用 venv，不会动随意路径，也
+**不会** 碰你 `<HERMES_HOME>/` 里的数据（角色卡、SOUL.md、快照都是
+个人内容，不是安装产物）。
+
 ### 依赖
 
 - Python ≥ 3.10
