@@ -17,7 +17,55 @@ HermesTavern は SillyTavern V2 キャラクターカード(`.png` / `.json` /
 Hermes に向ければエージェントはキャラクターになりきります——すでに設定済みの
 あらゆるゲートウェイ(CLI、メール、Telegram、Discord、Slack、…)を横断して。
 
-**系譜:** `TavernAI` → `SillyTavern` → **`HermesTavern`**
+**系譜:** `TavernAI` → `SillyTavern` → **`HermesTavern`** → **`SoulTavern`** *(進行中)*
+
+---
+
+## ビジョン: HermesTavern から SoulTavern へ
+
+HermesTavern は、より大きな方向性の最初の具体例です——「セッション
+開始時に永続的な人格ファイルを読み込む」あらゆる agent runtime に、
+SillyTavern キャラクターカードのエコシステム全体を接続可能にする、
+というのが大きな方向性です。
+
+これを **SoulTavern** という形に一般化中: 複数 target に対応する
+アダプター。起点は `--target hermes`(本プロジェクト、動作変更なし)、
+続いて `--target openclaw` と汎用 SOUL.md フォールバックを追加します。
+リネームは v1.0 で発生し、それまでは `hermes-tavern` が現状のまま
+動作します。
+
+### 3 つの原則
+
+1. **「魂の可搬性」を優先し、「機能の完璧再現」は追わない。**
+   SillyTavern や RisuAI は重度 RP のための場であり、SoulTavern が
+   扱うのは一方向ポーティング——コミュニティが作成済みの何千もの
+   V2 キャラクターカードを、SillyTavern のプロトコルをネイティブに
+   話さない agent runtime へ搬入する作業です。失う 30-40%
+   (トークンストリーミング、swipe/regen/branch、キーワードトリガ
+   lorebook 挿入)は channel/UI 層のメカニズムで、意図的に追求し
+   ません。移植できる 70-80% で軽度〜中度 RP のほとんどはカバー
+   できます。
+
+2. **ファイル単位の適応が普遍的なインターフェース。** セッション
+   開始時に markdown システムプロンプトファイルを読み込む agent
+   runtime はすべて適応対象になります。適応は 2 層: (a) V2
+   フィールドをその runtime 固有のファイル群へレンダリング(Hermes は
+   `SOUL.md` + `HERMES.md`;OpenClaw は `SOUL.md` + `IDENTITY.md` +
+   `AGENTS.md`)、(b) ペルソナファイルの先頭に **IDENTITY DIRECTIVE**
+   を注入し、その runtime のデフォルト「私は AI アシスタントです」
+   フレーミングを抑え込む。(b) が要——抑えられないと、agent は魂の
+   衣を被っただけの自分自身のままです。
+
+3. **CLI は決定的処理、LLM 仕事は agent に。** Python ツールは独立
+   した LLM へ shell out しません(v0.4.0 で踏んだ轍、v0.4.5 で
+   修正済み)。カードが常時コンテキストの容量を超えた場合、CLI は
+   `source.md` をディスクに置き、終了コード 2 で抜けます;呼び出し
+   側の agent が自身のコンテキストで自身のファイルツールを用いて
+   V2 分類を実行します。これによりツールは LLM CLI のバージョン
+   進化に依存せず、agent は第三者ファイルを扱う際の信頼姿勢を
+   そのまま適用できます——ポリシーと衝突する内容は正々堂々と
+   拒否でき、欠落はインデックスで可視化される(これは誠実なシグナル
+   であり、密かな書き換えではありません)。
 
 ---
 

@@ -9,9 +9,12 @@ from jinja2 import ChainableUndefined, Environment, PackageLoader, select_autoes
 
 from .sanitize import sanitize
 from .substitute import substitute
+from .targets import DEFAULT_TARGET, Target
 
-SOUL_BUDGET = 19_000
-HERMES_BUDGET = 19_000
+# Backwards-compatible aliases — internal code paths now consult a Target
+# object, but tests and external callers may still import these directly.
+SOUL_BUDGET = DEFAULT_TARGET.soul_budget
+HERMES_BUDGET = DEFAULT_TARGET.companion_budget
 
 _METADATA_KEYS = ("creator", "creator_version", "creator_notes", "tags", "extensions")
 
@@ -86,13 +89,14 @@ def render(
     include_hermes_md: bool = True,
     trust_system_prompt: bool = False,
     enforce_budget: bool = True,
+    target: Target = DEFAULT_TARGET,
 ) -> RenderResult:
     """Render the parsed card.
 
     If ``enforce_budget`` is True (default), raise ``BudgetExceededError``
-    when SOUL exceeds 19k. apply_card sets this False so the rendered text
-    can flow into the distillation pipeline; the budget decision happens
-    one layer up.
+    when SOUL exceeds the target's soul_budget. apply_card sets this
+    False so the rendered text can flow into the oversized-card pipeline;
+    the budget decision happens one layer up.
 
     ``trust_system_prompt`` controls how ``system_prompt`` and
     ``post_history_instructions`` are placed: when False (default) they are
@@ -101,27 +105,31 @@ def render(
     section) as the V2 spec intends. Default False because card authors are
     third parties and these two fields are the most attractive prompt-injection
     surface.
+
+    ``target`` selects which agent runtime to render for. Defaults to the
+    Hermes target (the v0.5.x behavior). Other targets are introduced in
+    step 2 of the SoulTavern migration.
     """
     name = (data.get("name") or "Unnamed").strip()
     env = _env(name, user_noun)
 
     metadata = {k: data.get(k) for k in _METADATA_KEYS if data.get(k)}
-    soul = env.get_template("SOUL.md.j2").render(
+    soul = env.get_template(target.soul_template).render(
         data=data,
         metadata=metadata or None,
         user_noun=user_noun,
         trust_system_prompt=trust_system_prompt,
     )
     soul = _collapse_blank_lines(soul)
-    if enforce_budget and len(soul) > SOUL_BUDGET:
-        raise BudgetExceededError("SOUL.md", len(soul), SOUL_BUDGET)
+    if enforce_budget and len(soul) > target.soul_budget:
+        raise BudgetExceededError(target.soul_filename, len(soul), target.soul_budget)
 
     hermes_text: str | None = None
     truncated = 0
     book = data.get("character_book") if include_hermes_md else None
     if isinstance(book, dict):
         entries = _book_entries(book)
-        hermes_text, truncated = _render_hermes(env, book, entries, name)
+        hermes_text, truncated = _render_hermes(env, book, entries, name, target=target)
     return RenderResult(soul=soul, hermes=hermes_text, truncated_entries=truncated)
 
 
@@ -131,29 +139,32 @@ def render_curated_soul(
     *,
     user_noun: str = "the visitor",
     enforce_budget: bool = True,
+    target: Target = DEFAULT_TARGET,
 ) -> str:
     """Render the curated SOUL.md from a Classification result.
 
-    Used in distillation mode: the always-on persona file is built from
-    a small subset of categories (identity + personality +
+    Used in the oversized-card flow: the always-on persona file is built
+    from a small subset of categories (identity + personality +
     roleplay_guides). Other categories live in extended/ and are reached
-    via the HERMES.md index.
+    via the companion-file index.
 
     Raises ``BudgetExceededError`` (when ``enforce_budget``) if the
-    rendered curated SOUL exceeds the hard cap — caller can fall back
-    to a follow-up compression call in that case.
+    rendered curated SOUL exceeds the target's soul_budget — caller can
+    fall back to a follow-up compression call in that case.
     """
     from .classify import SOUL_PICKS  # local import to avoid module-cycle at top
     env = _env(char_name, user_noun)
     picks = {cat: classification.categories.get(cat, "") for cat in SOUL_PICKS}
-    soul = env.get_template("SOUL.md.curated.j2").render(
+    soul = env.get_template(target.curated_soul_template).render(
         data={"name": char_name},
         user_noun=user_noun,
         picks=picks,
     )
     soul = _collapse_blank_lines(soul)
-    if enforce_budget and len(soul) > SOUL_BUDGET:
-        raise BudgetExceededError("curated SOUL.md", len(soul), SOUL_BUDGET)
+    if enforce_budget and len(soul) > target.soul_budget:
+        raise BudgetExceededError(
+            f"curated {target.soul_filename}", len(soul), target.soul_budget,
+        )
     return soul
 
 
@@ -169,13 +180,15 @@ def _render_hermes(
     book: dict[str, Any],
     entries: list[dict[str, Any]],
     char_name: str,
+    *,
+    target: Target = DEFAULT_TARGET,
 ) -> tuple[str, int]:
-    template = env.get_template("HERMES.md.j2")
+    template = env.get_template(target.companion_template)
     text = _collapse_blank_lines(
         template.render(book=book, entries=entries, char_name=char_name)
     )
     truncated = 0
-    while len(text) > HERMES_BUDGET and entries:
+    while len(text) > target.companion_budget and entries:
         entries = entries[:-1]
         truncated += 1
         text = _collapse_blank_lines(

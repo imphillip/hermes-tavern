@@ -63,9 +63,10 @@ from . import render as render_mod
 from . import snapshots as snap_mod
 from . import staging as staging_mod
 from .parse import load_card
-from .render import SOUL_BUDGET, BudgetExceededError, RenderResult, render
+from .render import BudgetExceededError, RenderResult, render
 from .snapshots import Snapshot
 from .staging import NeedsAgentCategorizationError
+from .targets import DEFAULT_TARGET, Target
 
 # Re-export so callers don't need to reach into staging.
 __all__ = [
@@ -102,9 +103,10 @@ __all__ = [
 ]
 
 DEFAULT_USER_NOUN = "the visitor"
-# 75% of the 20k Hermes slot. Above this, we route through the agent
-# categorization flow rather than try to ship the rendered text as-is.
-OVERSIZE_THRESHOLD = 15_000
+# Backwards-compatible alias — internal code paths consult a Target
+# (currently always DEFAULT_TARGET / Hermes), but tests and external
+# callers may still import this directly.
+OVERSIZE_THRESHOLD = DEFAULT_TARGET.oversize_threshold
 
 _ACTIVE_FILE = ".active.json"
 _TRASH_DIR = ".trash"
@@ -177,12 +179,19 @@ def trash_dir(home: Path) -> Path:
     return cards_dir(home) / _TRASH_DIR
 
 
-def soul_path(home: Path) -> Path:
-    return home / "SOUL.md"
+def soul_path(home: Path, target: Target = DEFAULT_TARGET) -> Path:
+    return home / target.soul_filename
 
 
-def hermes_path(home: Path) -> Path:
-    return home / "HERMES.md"
+def hermes_path(home: Path, target: Target = DEFAULT_TARGET) -> Path:
+    """Path to the rendered companion file (lorebook + index).
+
+    Name kept as ``hermes_path`` for backward compat; conceptually this
+    is the companion file, named per ``target.companion_filename``. The
+    function will be renamed to ``companion_path`` when the package
+    itself is renamed in step 4 of the SoulTavern migration.
+    """
+    return home / target.companion_filename
 
 
 def _extended_dir_for(card_file: str, home: Path) -> Path:
@@ -445,10 +454,16 @@ def apply_card(
     )
 
     if not is_oversized:
-        if len(rendered.soul) > SOUL_BUDGET:
-            raise BudgetExceededError("SOUL.md", len(rendered.soul), SOUL_BUDGET)
-        if rendered.hermes is not None and len(rendered.hermes) > SOUL_BUDGET:
-            raise BudgetExceededError("HERMES.md", len(rendered.hermes), SOUL_BUDGET)
+        if len(rendered.soul) > DEFAULT_TARGET.soul_budget:
+            raise BudgetExceededError(
+                DEFAULT_TARGET.soul_filename, len(rendered.soul), DEFAULT_TARGET.soul_budget,
+            )
+        if rendered.hermes is not None and len(rendered.hermes) > DEFAULT_TARGET.companion_budget:
+            raise BudgetExceededError(
+                DEFAULT_TARGET.companion_filename,
+                len(rendered.hermes),
+                DEFAULT_TARGET.companion_budget,
+            )
         wrote_hermes = _write_outputs_normal(
             home, rendered, overwrite=overwrite, write_hermes=not soul_only
         )

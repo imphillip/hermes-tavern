@@ -17,7 +17,51 @@ out, point Hermes at it, and your agent is in character — across every
 gateway you've already configured (CLI, email, Telegram, Discord,
 Slack, …).
 
-**Lineage:** `TavernAI` → `SillyTavern` → **`HermesTavern`**
+**Lineage:** `TavernAI` → `SillyTavern` → **`HermesTavern`** → **`SoulTavern`** *(in progress)*
+
+---
+
+## Vision: from HermesTavern to SoulTavern
+
+HermesTavern is the first concrete instance of a broader direction:
+let any agent runtime that loads a persistent persona file at session
+start pick up the entire SillyTavern card ecosystem.
+
+We're generalizing this into **SoulTavern** — a multi-target adapter
+starting with `--target hermes` (this project, unchanged) and adding
+`--target openclaw` plus a generic SOUL.md fallback. The rename
+happens at v1.0; until then, `hermes-tavern` keeps working as today.
+
+### Three principles
+
+1. **Soul portability over feature parity.** SillyTavern and RisuAI
+   exist for hardcore RP. SoulTavern's job is one-way porting — take
+   the thousands of community-made V2 cards and make them loadable in
+   agent runtimes that don't natively speak SillyTavern. The 30-40%
+   that doesn't survive (token streaming, swipe / regen / branch,
+   keyword-triggered lore injection) is channel/UI machinery we
+   explicitly don't chase. The 70-80% that does port covers most
+   casual-to-mid RP usage.
+
+2. **File-level adaptation is the universal interface.** Any agent
+   runtime that loads markdown system-prompt files at session start
+   is a candidate. Adaptation has two layers: (a) render V2 fields
+   into that runtime's specific files (`SOUL.md` + `HERMES.md` for
+   Hermes; `SOUL.md` + `IDENTITY.md` + `AGENTS.md` for OpenClaw), and
+   (b) inject an **IDENTITY DIRECTIVE** that suppresses the runtime's
+   default "I'm an AI assistant" framing. (b) is the linchpin:
+   without it, the agent stays itself wearing a costume.
+
+3. **Deterministic CLI, agent-driven LLM work.** The Python tool
+   never shells out to a separate LLM (a v0.4.0 mistake corrected in
+   v0.4.5). When a card overflows always-on context, the CLI stages
+   `source.md` and exits with code 2; the calling agent does the V2
+   categorization in its own context using its own file tools. This
+   keeps the tool durable across LLM CLI evolution and gives the
+   agent the same trust posture it applies to any third-party file —
+   including the ability to decline policy-conflicting categories
+   (their absence becomes visible in the index, an honest signal
+   rather than a silent rewrite).
 
 ---
 

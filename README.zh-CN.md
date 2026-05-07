@@ -16,7 +16,44 @@ HermesTavern 是一个一次性导入工具，把 SillyTavern V2 角色卡
 你的 agent 就进入角色——而且 Hermes 已经接通的所有渠道都同步生效
 （CLI、邮件、Telegram、Discord、Slack……）。
 
-**血缘:** `TavernAI` → `SillyTavern` → **`HermesTavern`**
+**血脉:** `TavernAI` → `SillyTavern` → **`HermesTavern`** → **`SoulTavern`** *(进行中)*
+
+---
+
+## 愿景：从 HermesTavern 到 SoulTavern
+
+HermesTavern 是更大方向上的第一个具体实例：让任何"会话开始时加载固定
+人格文件"的 agent runtime，都有机会接入完整的 SillyTavern 角色卡生态。
+
+我们正把这件事抽象成 **SoulTavern**——一个多目标适配器：起步
+`--target hermes`（即本项目，行为不变），扩展 `--target openclaw` 和
+通用 SOUL.md 回退。改名发生在 v1.0；在那之前 `hermes-tavern` 继续按
+现在的方式工作。
+
+### 三条原则
+
+1. **以"灵魂可移植"为先，不追"功能完美"。** SillyTavern 和 RisuAI 是
+   重度 RP 的归宿；SoulTavern 做的是单向移植——把社区已经做好的成千
+   上万张 V2 角色卡，搬到那些原生不说 SillyTavern 协议的 agent
+   runtime 上。损失的 30-40%（流式 token、swipe/regen/branch、
+   关键词触发 lorebook 注入）属于 channel/UI 层的机制，我们刻意不追；
+   能成功移植的 70-80% 已经够覆盖大部分轻度到中度 RP 场景。
+
+2. **文件级适配是通用接口。** 任何"会话开始时加载 markdown 系统提示
+   词文件"的 agent runtime 都可以做适配目标。适配分两层：(a) 把 V2
+   字段渲染到该 runtime 对应的提示词文件（Hermes 是 `SOUL.md` +
+   `HERMES.md`；OpenClaw 是 `SOUL.md` + `IDENTITY.md` +
+   `AGENTS.md`），(b) 在人格文件顶端注入 **IDENTITY DIRECTIVE**，
+   压制该 runtime 默认的"我是 AI 助手"自我框架。(b) 是命门——压不
+   住，agent 只是穿了件灵魂的衣服，本质还是它自己。
+
+3. **CLI 做确定性工作，LLM 工作交给 agent。** Python 工具不 shell
+   out 调任何独立 LLM（v0.4.0 踩过这个坑，v0.4.5 改正了）。当卡片
+   超过常驻上下文容量，CLI 把 `source.md` 摆到磁盘上、退出码 2；
+   调用方 agent 在自己的上下文里用自己的文件工具做 V2 分类。这样
+   工具不依赖 LLM CLI 的版本演化，agent 处理素材时的信任态度也跟
+   它处理任何第三方文件一样——遇到与策略冲突的内容可以正大光明地
+   拒绝，缺失会在索引里可见（这是诚实的信号，不是悄悄改写）。
 
 ---
 
