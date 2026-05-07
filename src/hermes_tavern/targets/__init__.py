@@ -25,9 +25,22 @@ behavior unchanged).
 from __future__ import annotations
 
 from .base import Target
+from .generic import GENERIC
 from .hermes import HERMES
+from .openclaw import OPENCLAW
 
-TARGETS: dict[str, Target] = {"hermes": HERMES}
+TARGETS: dict[str, Target] = {
+    "hermes": HERMES,
+    "openclaw": OPENCLAW,
+    "generic": GENERIC,
+}
 DEFAULT_TARGET: Target = HERMES
 
-__all__ = ["DEFAULT_TARGET", "HERMES", "TARGETS", "Target"]
+__all__ = [
+    "DEFAULT_TARGET",
+    "GENERIC",
+    "HERMES",
+    "OPENCLAW",
+    "TARGETS",
+    "Target",
+]

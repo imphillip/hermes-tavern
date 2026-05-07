@@ -41,6 +41,11 @@ class Target:
             ``apply_card`` routes through the agent-driven oversized
             flow instead of writing the rendered output as-is. Usually
             75% of the runtime slot.
+        implemented: True iff the target's templates and rendering
+            pipeline are real and tested. Skeleton targets (registered
+            for CLI discovery but not yet functional) have this set to
+            False; the CLI checks before invoking and surfaces a
+            friendly "not yet implemented" message.
     """
 
     name: str
@@ -52,3 +57,4 @@ class Target:
     soul_budget: int
     companion_budget: int
     oversize_threshold: int
+    implemented: bool = True

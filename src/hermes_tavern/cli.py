@@ -13,11 +13,36 @@ from .parse import CardError, load_card
 from .render import BudgetExceededError, render
 from .scan import Finding, scan_card
 from .snapshots import SnapshotError
+from .targets import DEFAULT_TARGET, TARGETS, Target
 
 _EXIT_OK = 0
 _EXIT_NEEDS_AGENT = 2  # also used as the "usage" exit, by argparse convention
 _EXIT_USAGE = 2
 _EXIT_FAIL = 1
+
+
+def _resolve_target(name: str) -> Target:
+    """Look up a target by ``--target`` value, refusing unknown or
+    skeleton targets with a clear message.
+
+    Skeleton targets (``implemented=False``) are listed by ``--help`` so
+    users can discover the migration direction, but actually invoking
+    them in v0.6.x is rejected — those slots fill in step 3 of the
+    SoulTavern migration.
+    """
+    target = TARGETS.get(name)
+    if target is None:
+        valid = ", ".join(sorted(TARGETS.keys()))
+        raise SystemExit(
+            f"hermes-tavern: unknown --target {name!r}. Valid: {valid}"
+        )
+    if not target.implemented:
+        raise SystemExit(
+            f"hermes-tavern: --target {name!r} is registered but not yet "
+            f"implemented in this release. v0.6.x supports --target hermes "
+            f"only; openclaw and generic land in v0.7+."
+        )
+    return target
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -61,6 +86,10 @@ def _build_parser() -> argparse.ArgumentParser:
     p_import = sub.add_parser("import", help="Import a card and make it the active persona.")
     p_import.add_argument("--card", required=True, type=Path, help="Path to .json/.png/.yaml card")
     p_import.add_argument("--home", required=True, type=Path, help="Target HERMES_HOME directory")
+    p_import.add_argument("--target", default=DEFAULT_TARGET.name,
+                          choices=sorted(TARGETS.keys()),
+                          help=f"Agent runtime target (default: {DEFAULT_TARGET.name}). "
+                               "openclaw / generic are skeletons in v0.6.x.")
     p_import.add_argument("--user-noun", default=library.DEFAULT_USER_NOUN,
                           help="How {{user}} should be addressed (default: 'the visitor')")
     p_import.add_argument("--overwrite", action="store_true", help="Replace existing SOUL.md / HERMES.md")
@@ -83,6 +112,9 @@ def _build_parser() -> argparse.ArgumentParser:
     p_finalize.add_argument("--card", required=True,
                             help="Card filename or character name (case-insensitive prefix match)")
     p_finalize.add_argument("--home", required=True, type=Path)
+    p_finalize.add_argument("--target", default=DEFAULT_TARGET.name,
+                            choices=sorted(TARGETS.keys()),
+                            help=f"Agent runtime target (default: {DEFAULT_TARGET.name}).")
     p_finalize.add_argument("--user-noun", default=library.DEFAULT_USER_NOUN,
                             help="How {{user}} should be addressed")
     p_finalize.add_argument("--trust-system-prompt", action="store_true",
@@ -95,6 +127,9 @@ def _build_parser() -> argparse.ArgumentParser:
 
     p_validate = sub.add_parser("validate", help="Parse a card and report field completeness / budget.")
     p_validate.add_argument("--card", required=True, type=Path)
+    p_validate.add_argument("--target", default=DEFAULT_TARGET.name,
+                            choices=sorted(TARGETS.keys()),
+                            help=f"Agent runtime target (default: {DEFAULT_TARGET.name}).")
     p_validate.add_argument("--user-noun", default=library.DEFAULT_USER_NOUN)
     p_validate.set_defaults(handler=_cmd_validate)
 
@@ -112,6 +147,10 @@ def _build_parser() -> argparse.ArgumentParser:
     p_switch.add_argument("--card", required=True,
                           help="Card filename or character name (case-insensitive prefix match)")
     p_switch.add_argument("--home", required=True, type=Path)
+    p_switch.add_argument("--target", default=None,
+                          choices=sorted(TARGETS.keys()),
+                          help="Override the runtime target. Defaults to whatever the active record "
+                               f"recorded (or {DEFAULT_TARGET.name} if no prior record).")
     p_switch.add_argument("--user-noun", default=None,
                           help="Override the user noun (defaults to previously active value)")
     p_switch.add_argument("--soul-only", dest="soul_only", action="store_true", default=None,
@@ -164,6 +203,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def _cmd_import(args: argparse.Namespace) -> int:
+    target = _resolve_target(args.target)
     data = load_card(args.card)
     findings = scan_card(data)
     _emit_findings(findings, trust_system_prompt=args.trust_system_prompt)
@@ -173,6 +213,7 @@ def _cmd_import(args: argparse.Namespace) -> int:
             user_noun=args.user_noun,
             include_hermes_md=not args.soul_only,
             trust_system_prompt=args.trust_system_prompt,
+            target=target,
         )
         _print_dry_run(rendered)
         return _EXIT_OK
@@ -183,18 +224,21 @@ def _cmd_import(args: argparse.Namespace) -> int:
         soul_only=args.soul_only,
         overwrite=args.overwrite,
         trust_system_prompt=args.trust_system_prompt,
+        target=target,
     )
     _report_outcome(args.home, outcome, library_path, soul_only=args.soul_only)
     return _EXIT_OK
 
 
 def _cmd_finalize(args: argparse.Namespace) -> int:
+    target = _resolve_target(args.target)
     outcome = library.finalize_card(
         args.home,
         args.card,
         user_noun=args.user_noun,
         trust_system_prompt=args.trust_system_prompt,
         overwrite=args.overwrite,
+        target=target,
     )
     library_path = library.find_card(args.home, args.card)
     _report_outcome(args.home, outcome, library_path, soul_only=False)
@@ -202,11 +246,11 @@ def _cmd_finalize(args: argparse.Namespace) -> int:
 
 
 def _cmd_validate(args: argparse.Namespace) -> int:
-    from .render import SOUL_BUDGET
+    target = _resolve_target(args.target)
 
     data = load_card(args.card)
     rendered = render(data, user_noun=args.user_noun, include_hermes_md=True,
-                      enforce_budget=False)
+                      enforce_budget=False, target=target)
     name = data.get("name") or "(no name)"
     print(f"name: {name}")
     fields = ["description", "personality", "scenario", "first_mes",
@@ -216,17 +260,18 @@ def _cmd_validate(args: argparse.Namespace) -> int:
         marker = "y" if data.get(field) else "."
         print(f"  [{marker}] {field}")
 
-    print(f"SOUL.md size:   {len(rendered.soul):>5} / {SOUL_BUDGET} chars"
-          f"{_budget_marker(len(rendered.soul))}")
+    print(f"{target.soul_filename} size:   {len(rendered.soul):>5} / "
+          f"{target.soul_budget} chars{_budget_marker(len(rendered.soul), target)}")
     if rendered.hermes is not None:
         size = len(rendered.hermes)
-        print(f"HERMES.md size: {size:>5} / {SOUL_BUDGET} chars{_budget_marker(size)}")
+        print(f"{target.companion_filename} size: {size:>5} / "
+              f"{target.companion_budget} chars{_budget_marker(size, target)}")
         if rendered.truncated_entries:
             print(f"warning: would drop {rendered.truncated_entries} lorebook entries")
 
     needs_agent = (
-        len(rendered.soul) > OVERSIZE_THRESHOLD
-        or (rendered.hermes is not None and len(rendered.hermes) > OVERSIZE_THRESHOLD)
+        len(rendered.soul) > target.oversize_threshold
+        or (rendered.hermes is not None and len(rendered.hermes) > target.oversize_threshold)
     )
     if needs_agent:
         print("note: import will route through the agent V2-categorization flow "
@@ -239,11 +284,10 @@ def _cmd_validate(args: argparse.Namespace) -> int:
     return _EXIT_OK
 
 
-def _budget_marker(size: int) -> str:
-    from .render import SOUL_BUDGET
-    if size > SOUL_BUDGET:
+def _budget_marker(size: int, target: Target = DEFAULT_TARGET) -> str:
+    if size > target.soul_budget:
         return "  [over hard cap — agent categorization required]"
-    if size > OVERSIZE_THRESHOLD:
+    if size > target.oversize_threshold:
         return "  [over 75% threshold — agent categorization on import]"
     return ""
 
@@ -285,18 +329,20 @@ def _cmd_current(args: argparse.Namespace) -> int:
 
 
 def _cmd_switch(args: argparse.Namespace) -> int:
-    target, outcome = library.switch_to(
+    target_override = _resolve_target(args.target) if args.target else None
+    target_path, outcome = library.switch_to(
         args.home,
         args.card,
         user_noun=args.user_noun,
         soul_only=args.soul_only,
         trust_system_prompt=args.trust_system_prompt,
+        target=target_override,
     )
-    data = load_card(target)
+    data = load_card(target_path)
     findings = scan_card(data)
     _emit_findings(findings, trust_system_prompt=bool(args.trust_system_prompt))
-    print(f"switched to {target.name}")
-    _report_outcome(args.home, outcome, target,
+    print(f"switched to {target_path.name}")
+    _report_outcome(args.home, outcome, target_path,
                     soul_only=outcome.rendered.hermes is None and not outcome.finalized)
     return _EXIT_OK
 

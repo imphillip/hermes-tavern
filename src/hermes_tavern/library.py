@@ -141,6 +141,7 @@ class ActiveRecord:
     trust_system_prompt: bool = False
     finalized: bool = False  # True iff this card went through the agent categorization flow
     extended_dir: str | None = None  # relative to home
+    target: str = "hermes"  # which runtime target wrote SOUL/companion files
 
     def to_json(self) -> str:
         return json.dumps(asdict(self), indent=2, ensure_ascii=False) + "\n"
@@ -159,6 +160,8 @@ class ActiveRecord:
             # accept legacy `distilled` key as the same signal
             finalized=payload.get("finalized", payload.get("distilled", False)),
             extended_dir=payload.get("extended_dir"),
+            # legacy active records without a target field were all hermes
+            target=payload.get("target", "hermes"),
         )
 
 
@@ -192,6 +195,16 @@ def hermes_path(home: Path, target: Target = DEFAULT_TARGET) -> Path:
     itself is renamed in step 4 of the SoulTavern migration.
     """
     return home / target.companion_filename
+
+
+def _target_for(name: str) -> Target:
+    """Look up a target by name with a default fallback to Hermes.
+
+    Used internally when reading legacy ActiveRecord values that may
+    have been written before the ``target`` field existed.
+    """
+    from .targets import TARGETS  # local to avoid module-cycle nag
+    return TARGETS.get(name, DEFAULT_TARGET)
 
 
 def _extended_dir_for(card_file: str, home: Path) -> Path:
@@ -360,10 +373,11 @@ def _write_outputs_normal(
     *,
     overwrite: bool,
     write_hermes: bool,
+    target: Target = DEFAULT_TARGET,
 ) -> bool:
-    """Normal-mode write: SOUL.md + optional HERMES.md."""
-    soul = soul_path(home)
-    hermes = hermes_path(home)
+    """Normal-mode write: SOUL.md + optional companion file."""
+    soul = soul_path(home, target)
+    hermes = hermes_path(home, target)
     if not overwrite:
         _check_no_existing(home, soul, hermes)
     home.mkdir(parents=True, exist_ok=True)
@@ -384,8 +398,11 @@ def write_outputs(
     *,
     overwrite: bool,
     write_hermes: bool,
+    target: Target = DEFAULT_TARGET,
 ) -> bool:
-    return _write_outputs_normal(home, rendered, overwrite=overwrite, write_hermes=write_hermes)
+    return _write_outputs_normal(
+        home, rendered, overwrite=overwrite, write_hermes=write_hermes, target=target,
+    )
 
 
 def _write_outputs_finalized(
@@ -394,10 +411,11 @@ def _write_outputs_finalized(
     soul: str,
     hermes: str,
     overwrite: bool,
+    target: Target = DEFAULT_TARGET,
 ) -> None:
-    """Finalize-mode write: curated SOUL.md + indexed HERMES.md."""
-    soul_p = soul_path(home)
-    hermes_p = hermes_path(home)
+    """Finalize-mode write: curated SOUL.md + indexed companion file."""
+    soul_p = soul_path(home, target)
+    hermes_p = hermes_path(home, target)
     if not overwrite:
         _check_no_existing(home, soul_p, hermes_p)
     home.mkdir(parents=True, exist_ok=True)
@@ -414,13 +432,15 @@ def apply_card(
     overwrite: bool = False,
     trust_system_prompt: bool = False,
     action: str = "apply",
+    target: Target = DEFAULT_TARGET,
 ) -> ApplyOutcome:
     """Render and write SOUL.md / HERMES.md for ``card_path``.
 
     Three exit paths:
 
-    1. **Fits in always-on context** (≤ 15k per slot) → render directly,
-       write SOUL.md + HERMES.md, return ``ApplyOutcome``.
+    1. **Fits in always-on context** (≤ target.oversize_threshold per
+       slot) → render directly, write SOUL + companion file, return
+       ``ApplyOutcome``.
     2. **Oversized but extended/ already populated by the agent** →
        behave like ``finalize_card`` (assemble from on-disk material).
        This is what ``switch_to`` hits when re-activating an already-
@@ -433,7 +453,9 @@ def apply_card(
     Captures a pristine snapshot on first invocation, then a snapshot
     after the mutation completes — allowing later ``revert`` operations.
     """
-    snap_mod.ensure_pristine(home, soul=soul_path(home), hermes=hermes_path(home))
+    snap_mod.ensure_pristine(
+        home, soul=soul_path(home, target), hermes=hermes_path(home, target),
+    )
 
     data = load_card(card_path)
     rendered = render(
@@ -442,30 +464,32 @@ def apply_card(
         include_hermes_md=not soul_only,
         trust_system_prompt=trust_system_prompt,
         enforce_budget=False,
+        target=target,
     )
     char_name = (data.get("name") or card_path.stem).strip()
     now = datetime.now(timezone.utc).isoformat(timespec="seconds")
 
     is_oversized = (
         not soul_only and (
-            len(rendered.soul) > OVERSIZE_THRESHOLD
-            or (rendered.hermes is not None and len(rendered.hermes) > OVERSIZE_THRESHOLD)
+            len(rendered.soul) > target.oversize_threshold
+            or (rendered.hermes is not None and len(rendered.hermes) > target.oversize_threshold)
         )
     )
 
     if not is_oversized:
-        if len(rendered.soul) > DEFAULT_TARGET.soul_budget:
+        if len(rendered.soul) > target.soul_budget:
             raise BudgetExceededError(
-                DEFAULT_TARGET.soul_filename, len(rendered.soul), DEFAULT_TARGET.soul_budget,
+                target.soul_filename, len(rendered.soul), target.soul_budget,
             )
-        if rendered.hermes is not None and len(rendered.hermes) > DEFAULT_TARGET.companion_budget:
+        if rendered.hermes is not None and len(rendered.hermes) > target.companion_budget:
             raise BudgetExceededError(
-                DEFAULT_TARGET.companion_filename,
+                target.companion_filename,
                 len(rendered.hermes),
-                DEFAULT_TARGET.companion_budget,
+                target.companion_budget,
             )
         wrote_hermes = _write_outputs_normal(
-            home, rendered, overwrite=overwrite, write_hermes=not soul_only
+            home, rendered, overwrite=overwrite, write_hermes=not soul_only,
+            target=target,
         )
         record = ActiveRecord(
             name=char_name,
@@ -476,6 +500,7 @@ def apply_card(
             has_hermes_md=wrote_hermes,
             trust_system_prompt=trust_system_prompt,
             finalized=False,
+            target=target.name,
         )
         write_active(home, record)
         snap_mod.take_snapshot(
@@ -483,8 +508,8 @@ def apply_card(
             action=action,
             name=char_name,
             card_file=card_path.name,
-            soul=soul_path(home),
-            hermes=hermes_path(home),
+            soul=soul_path(home, target),
+            hermes=hermes_path(home, target),
             active_record=asdict(record),
         )
         return ApplyOutcome(rendered=rendered, wrote_hermes_md=wrote_hermes, finalized=False)
@@ -503,6 +528,7 @@ def apply_card(
             overwrite=overwrite,
             action=action,
             now=now,
+            target=target,
         )
 
     # Cold oversize: stage source.md + per-entry payloads, raise.
@@ -518,7 +544,7 @@ def apply_card(
         char_name=char_name,
         source_md_path=source_md,
         rendered_size=rendered_size,
-        threshold=OVERSIZE_THRESHOLD,
+        threshold=target.oversize_threshold,
     )
 
 
@@ -533,6 +559,7 @@ def _finalize_in_place(
     overwrite: bool,
     action: str,
     now: str,
+    target: Target = DEFAULT_TARGET,
 ) -> ApplyOutcome:
     """Shared assembly step for ``apply_card`` (re-run after agent work)
     and ``finalize_card`` (explicit finalize invocation)."""
@@ -541,12 +568,14 @@ def _finalize_in_place(
 
     classification = classify_mod.load_classification_from_extended(extended_dir)
     soul_md = render_mod.render_curated_soul(
-        char_name, classification, user_noun=user_noun
+        char_name, classification, user_noun=user_noun, target=target,
     )
     extended_files = extended_mod.collect_extended_files(home, extended_dir, char_name)
     hermes_md = extended_mod.render_indexed_hermes_md(char_name, extended_files)
 
-    _write_outputs_finalized(home, soul=soul_md, hermes=hermes_md, overwrite=overwrite)
+    _write_outputs_finalized(
+        home, soul=soul_md, hermes=hermes_md, overwrite=overwrite, target=target,
+    )
 
     record = ActiveRecord(
         name=char_name,
@@ -558,6 +587,7 @@ def _finalize_in_place(
         trust_system_prompt=trust_system_prompt,
         finalized=True,
         extended_dir=str(extended_dir.relative_to(home)),
+        target=target.name,
     )
     write_active(home, record)
     snap_mod.take_snapshot(
@@ -565,8 +595,8 @@ def _finalize_in_place(
         action=action,
         name=char_name,
         card_file=card_path.name,
-        soul=soul_path(home),
-        hermes=hermes_path(home),
+        soul=soul_path(home, target),
+        hermes=hermes_path(home, target),
         active_record=asdict(record),
     )
     return ApplyOutcome(
@@ -586,16 +616,19 @@ def finalize_card(
     trust_system_prompt: bool = False,
     overwrite: bool = True,
     action: str = "finalize",
+    target: Target = DEFAULT_TARGET,
 ) -> ApplyOutcome:
-    """Assemble curated SOUL.md + indexed HERMES.md from agent-written
-    ``extended/<category>.md`` files. Default ``overwrite=True`` because
-    finalize is the natural completion of an oversize import that already
-    placed staging artifacts on disk.
+    """Assemble curated SOUL.md + indexed companion file from
+    agent-written ``extended/<category>.md`` files. Default
+    ``overwrite=True`` because finalize is the natural completion of an
+    oversize import that already placed staging artifacts on disk.
 
     Raises :class:`LibraryError` if the agent hasn't written any V2
     category files yet — the operator probably skipped the agent step.
     """
-    snap_mod.ensure_pristine(home, soul=soul_path(home), hermes=hermes_path(home))
+    snap_mod.ensure_pristine(
+        home, soul=soul_path(home, target), hermes=hermes_path(home, target),
+    )
 
     card_path = find_card(home, query)
     extended_dir = _extended_dir_for(card_path.name, home)
@@ -610,6 +643,7 @@ def finalize_card(
     rendered = render(
         data, user_noun=user_noun, include_hermes_md=True,
         trust_system_prompt=trust_system_prompt, enforce_budget=False,
+        target=target,
     )
     now = datetime.now(timezone.utc).isoformat(timespec="seconds")
     return _finalize_in_place(
@@ -622,6 +656,7 @@ def finalize_card(
         overwrite=overwrite,
         action=action,
         now=now,
+        target=target,
     )
 
 
@@ -633,6 +668,7 @@ def import_card(
     soul_only: bool = False,
     overwrite: bool = False,
     trust_system_prompt: bool = False,
+    target: Target = DEFAULT_TARGET,
 ) -> tuple[ApplyOutcome, Path]:
     """Copy ``src`` into the library and apply it as the active persona.
 
@@ -652,6 +688,7 @@ def import_card(
         overwrite=overwrite,
         trust_system_prompt=trust_system_prompt,
         action="import",
+        target=target,
     )
     return outcome, library_path
 
@@ -707,15 +744,20 @@ def switch_to(
     user_noun: str | None = None,
     soul_only: bool | None = None,
     trust_system_prompt: bool | None = None,
+    target: Target | None = None,
 ) -> tuple[Path, ApplyOutcome]:
     """Switch the active persona to a card already in the library.
 
-    Switching always overwrites SOUL.md / HERMES.md. If the target card
-    is oversized but its ``extended/`` is already populated (a previous
+    Switching always overwrites SOUL.md / companion. If the card is
+    oversized but its ``extended/`` is already populated (from a prior
     finalize), the switch reuses those files. If it's oversized and not
     yet finalized, :class:`NeedsAgentCategorizationError` propagates.
+
+    ``target`` defaults to the previously-active record's target, or to
+    :data:`DEFAULT_TARGET` if no prior record exists. Pass an explicit
+    target to override.
     """
-    target = find_card(home, query)
+    card_path = find_card(home, query)
     previous = read_active(home)
     chosen_user = user_noun or (previous.user_noun if previous else DEFAULT_USER_NOUN)
     chosen_soul_only = soul_only if soul_only is not None else (
@@ -724,16 +766,20 @@ def switch_to(
     chosen_trust = trust_system_prompt if trust_system_prompt is not None else (
         previous.trust_system_prompt if previous else False
     )
+    chosen_target = target if target is not None else (
+        _target_for(previous.target) if previous else DEFAULT_TARGET
+    )
     outcome = apply_card(
         home,
-        target,
+        card_path,
         user_noun=chosen_user,
         soul_only=chosen_soul_only,
         overwrite=True,
         trust_system_prompt=chosen_trust,
         action="switch",
+        target=chosen_target,
     )
-    return target, outcome
+    return card_path, outcome
 
 
 def get_meta(card_path: Path) -> dict[str, Any]:
