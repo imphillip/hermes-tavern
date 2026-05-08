@@ -16,13 +16,29 @@ Lorebook entries land in ``lore/<slug>.md``, indexed from ``AGENTS.md``.
 
 Step 2 of the SoulTavern migration only registers this target so the
 CLI's ``--target`` flag can list it and reject it gracefully. Real
-templates and the IDENTITY DIRECTIVE measurement spike happen in step 3.
+templates land in step 3.
 
-Provisional values (copied from Hermes — to be calibrated after the
-spike measures actual workspace prompt-budget headroom):
+Budget values calibrated from OpenClaw source
+(``src/agents/pi-embedded-helpers/bootstrap.ts:87-88``):
 
-- soul_budget / companion_budget: 19_000
-- oversize_threshold: 15_000
+- ``DEFAULT_BOOTSTRAP_MAX_CHARS = 12_000`` per file
+- ``DEFAULT_BOOTSTRAP_TOTAL_MAX_CHARS = 60_000`` across all bootstrap
+  files combined
+
+Both are user-configurable via ``agents.defaults.bootstrapMaxChars`` /
+``bootstrapTotalMaxChars`` in ``~/.openclaw/openclaw.json``. Per-file
+truncation runs at OpenClaw's load time — soultavern's job is to
+write within these caps to avoid mid-content truncation.
+
+OPENCLAW values:
+
+- ``soul_budget = 11_000`` (1k headroom under the 12k per-file cap)
+- ``companion_budget = 6_000`` (managed-section soft target; the
+  remaining ~6k of AGENTS.md is reserved for the user's existing
+  content. See "managed-section append" in
+  ``references/openclaw-target.md``.)
+- ``oversize_threshold = 9_000`` (~75% of soul_budget; matches the
+  Hermes ratio for routing through the agent categorization flow)
 
 ## Critical design constraints (must inform step 3)
 
@@ -46,20 +62,26 @@ SOUL.md carries persona body only.
 
 ## Open questions for step 3
 
-1. Even with IDENTITY DIRECTIVE in the AGENTS.md managed section, can
-   it actually outweigh ``BOOTSTRAP.md`` / ``TOOLS.md`` / ``HEARTBEAT.md``
-   contributions? If not, we need the workspace-stub mechanism described
-   in the openclaw-tavern memo (``--suppress-workspace-bootstrap`` flag,
-   reversibly).
-2. What's the real prompt-budget ceiling for an OpenClaw workspace?
-   The hard-coded 2 MB ``MAX_WORKSPACE_BOOTSTRAP_FILE_BYTES`` is not
-   the practical limit — we need the model context window minus
-   generation budget minus the bootstrap-files overhead.
-3. Extending the ``Target`` dataclass: needs ``companion_write_mode``
-   ("replace" vs "managed-section"), ``companion_section_marker``
-   (e.g. "soultavern:character"), and an ``extra_files`` field for
-   OpenClaw's third file (``IDENTITY.md``). Lock the shape after the
-   spike validates the design works at all.
+1. Workspace-stub mechanism (``--suppress-workspace-bootstrap`` flag)
+   from the openclaw-tavern memo: spike findings suggest this is **NOT
+   needed** — OpenClaw's default templates (BOOTSTRAP / TOOLS /
+   HEARTBEAT / USER) carry agent-philosophy framing rather than
+   work-agent framing, and SOUL.md template explicitly invites
+   character identities ("you're not a chatbot, you're becoming
+   someone"). Re-evaluate only if step 3 implementation hits actual
+   conflicts.
+2. Extending the ``Target`` dataclass: step 3 will need
+   ``companion_write_mode`` ("replace" vs "managed-section"),
+   ``companion_section_marker`` (e.g. "soultavern:character"), and an
+   ``extra_files`` tuple for OpenClaw's third file (``IDENTITY.md``).
+   Shape locks after the first real OpenClaw template render.
+3. ``user_noun`` source: should soultavern parse OpenClaw's
+   ``USER.md`` for "What to call them" and use that as the
+   ``{{user}}`` substitution, or stick with the Hermes-style
+   ``--user-noun`` flag default ("the visitor")? Defer to step 3.
+
+See ``skills/hermes-tavern/references/openclaw-target.md`` for the
+full spike findings, design rationale, and what's locked vs open.
 """
 
 from __future__ import annotations
@@ -73,8 +95,8 @@ OPENCLAW = Target(
     soul_template="SOUL.md.openclaw.j2",
     companion_template="AGENTS.md.openclaw.j2",
     curated_soul_template="SOUL.md.curated.openclaw.j2",
-    soul_budget=19_000,
-    companion_budget=19_000,
-    oversize_threshold=15_000,
+    soul_budget=11_000,
+    companion_budget=6_000,
+    oversize_threshold=9_000,
     implemented=False,
 )

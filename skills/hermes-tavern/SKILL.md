@@ -332,6 +332,7 @@ See `references/security.md` for the full threat model and what is
 - `references/security.md` — threat model, sanitiser layers, operator workflow
 - `references/oversized-cards.md` — agent-driven categorization flow, file layout, failure modes
 - `references/library-layout.md` — `<HERMES_HOME>/cards/` schema, snapshots, `--card` resolution
+- `references/openclaw-target.md` — OpenClaw target spike findings + step-3 design baseline (preview; OpenClaw target lands in v0.7)
 
 ## Files this skill writes
 
