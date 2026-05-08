@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from hermes_tavern import library
+from soultavern import library
 
 
 def test_import_creates_layout(home: Path, fixtures_dir: Path):

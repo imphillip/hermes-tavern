@@ -1,13 +1,13 @@
 ---
-name: hermes-tavern
-description: "Import and manage SillyTavern V2 character cards (.png/.json/.yaml) for Hermes-Agent. Imports write SOUL.md + HERMES.md; the same skill also handles list / current / switch / delete / restore / history / revert. Channel-agnostic — affects every gateway."
-version: 0.5.1
-author: HermesTavern contributors
+name: soultavern
+description: "Import and manage SillyTavern V2 character cards (.png/.json/.yaml) for any agent runtime with a SOUL.md-style persona file. v1.0 supports --target hermes (Hermes-Agent) and --target openclaw (OpenClaw workspaces). Channel-agnostic — affects every gateway."
+version: 1.0.0
+author: SoulTavern contributors
 license: MIT
 metadata:
   hermes:
-    tags: [Roleplay, CharacterCard, SillyTavern, SOUL, Persona, Library, TavernAI]
-    homepage: https://github.com/imphillip/hermes-tavern
+    tags: [Roleplay, CharacterCard, SillyTavern, SOUL, Persona, Library, TavernAI, OpenClaw]
+    homepage: https://github.com/imphillip/SoulTavern
 prerequisites:
   commands: [python]
   python:
@@ -15,7 +15,13 @@ prerequisites:
     packages: [pillow, pyyaml, jinja2]
 ---
 
-# HermesTavern
+# SoulTavern
+
+> _Lineage:_ TavernAI → SillyTavern → HermesTavern → **SoulTavern**
+
+The CLI binary is now `soultavern`. The previous name `hermes-tavern` is
+retained as a backward-compat alias — same entry point, identical
+behavior — so existing scripts keep working.
 
 ## When to use
 
@@ -62,7 +68,7 @@ character. Hermes loads `SOUL.md` (identity slot, 20k chars) and
 ## Prerequisites
 
 - Python 3.10+
-- The `hermes-tavern` CLI on PATH — run `bash scripts/install.sh` once
+- The `soultavern` CLI (formerly `hermes-tavern`) on PATH — run `bash scripts/install.sh` once
   (see Install below; the package is bundled as a wheel in `assets/`
   because it is not yet published to PyPI)
 - A target `HERMES_HOME` directory that Hermes will be launched against
@@ -74,15 +80,15 @@ bash scripts/install.sh
 ```
 
 The installer tries, in order: `pipx` → `uv tool` → a dedicated venv at
-`~/.local/share/hermes-tavern-venv` with a shim in `~/.local/bin`. It is
+`~/.local/share/soultavern-venv` with a shim in `~/.local/bin`. It is
 idempotent: if `hermes-tavern` is already on PATH, it exits without
-touching anything. Override paths with `HERMES_TAVERN_VENV` and
-`HERMES_TAVERN_BIN` env vars.
+touching anything. Override paths with `SOULTAVERN_VENV` and
+`SOULTAVERN_BIN` env vars.
 
 ## Uninstall
 
 Removing the skill folder (or `hermes skills uninstall hermes-tavern`)
-only clears the skill layer; the `hermes-tavern` CLI is installed in
+only clears the skill layer; the `soultavern` CLI (formerly `hermes-tavern`) is installed in
 the host system. Two-step uninstall:
 
 ```bash
@@ -104,15 +110,15 @@ The uninstaller is safe by design:
   start over).
 - It **only removes paths matching the layout `install.sh` uses**
   (pipx-managed, uv-managed, or the conventional venv at
-  `~/.local/share/hermes-tavern-venv` with shim at
-  `~/.local/bin/hermes-tavern`). If the CLI lives somewhere else
+  `~/.local/share/soultavern-venv` with shim at
+  `~/.local/bin/soultavern`). If the CLI lives somewhere else
   (e.g. an editable dev install), the script refuses and prints the
   path so you can clean it up by hand.
 
 ## Quick start
 
 ```bash
-hermes-tavern import --card aldous.png --home ~/.hermes-roleplay
+soultavern import --card aldous.png --home ~/.hermes-roleplay
 cd ~/.hermes-roleplay && HERMES_HOME=~/.hermes-roleplay hermes
 ```
 
@@ -125,24 +131,45 @@ Useful flags:
 
 ```bash
 # Preview without writing
-hermes-tavern import --card aldous.png --home ~/.hermes-roleplay --dry-run
+soultavern import --card aldous.png --home ~/.hermes-roleplay --dry-run
 
 # Replace existing files
-hermes-tavern import --card aldous.png --home ~/.hermes-roleplay --overwrite
+soultavern import --card aldous.png --home ~/.hermes-roleplay --overwrite
 
 # Custom address term for {{user}}
-hermes-tavern import --card aldous.png --home ~/.hermes-roleplay --user-noun "the operator"
+soultavern import --card aldous.png --home ~/.hermes-roleplay --user-noun "the operator"
 
 # Skip lorebook even if the card has one
-hermes-tavern import --card aldous.png --home ~/.hermes-roleplay --soul-only
+soultavern import --card aldous.png --home ~/.hermes-roleplay --soul-only
 
 # Sanity-check a card without writing (also runs the red-flag scan)
-hermes-tavern validate --card aldous.png
+soultavern validate --card aldous.png
 
 # Render system_prompt / post_history_instructions in their high-trust V2 slots
 # instead of inside untrusted blockquotes. Only for trusted card authors.
-hermes-tavern import --card aldous.png --home ~/.hermes-roleplay --trust-system-prompt
+soultavern import --card aldous.png --home ~/.hermes-roleplay --trust-system-prompt
+
+# Target a different agent runtime (default is hermes; openclaw is live in v1.0+)
+soultavern import --card aldous.png --home ~/.openclaw/workspace --target openclaw
 ```
+
+## Targets (multi-runtime support)
+
+`--target` selects which agent runtime the import is shaped for:
+
+| target | files written | notes |
+|---|---|---|
+| `hermes` (default) | `SOUL.md` + `HERMES.md` | Full lorebook in `HERMES.md`. Hermes loads `SOUL.md` from `HERMES_HOME` and `HERMES.md` from cwd. |
+| `openclaw` | `SOUL.md` + `AGENTS.md` (managed-section append) + `IDENTITY.md` | `AGENTS.md` outranks `SOUL.md` in OpenClaw's loader, so the IDENTITY DIRECTIVE goes there. Existing user content in `AGENTS.md` is preserved — only the section between `<!-- BEGIN soultavern:character -->` markers is touched. |
+| `generic` | *(skeleton — lands in a later release)* | Single `SOUL.md` + companion index for unspecified runtimes. |
+
+Per-target details:
+
+- `references/openclaw-target.md` — file layout, write strategy, and budget constants for OpenClaw
+- `references/openclaw-identity-directive.md` — the IDENTITY DIRECTIVE wording for OpenClaw, with iteration playbook
+
+The `--home` argument is the runtime's home directory (`HERMES_HOME` for
+hermes, the OpenClaw workspace dir for openclaw).
 
 ## Library management
 
@@ -153,29 +180,29 @@ already in the library.
 
 ```bash
 # What's loaded right now?
-hermes-tavern current --home ~/.hermes-roleplay
+soultavern current --home ~/.hermes-roleplay
 
 # What cards do I have?
-hermes-tavern list --home ~/.hermes-roleplay
-hermes-tavern list --home ~/.hermes-roleplay --all     # include trash
+soultavern list --home ~/.hermes-roleplay
+soultavern list --home ~/.hermes-roleplay --all     # include trash
 
 # Switch active persona
-hermes-tavern switch --card alice --home ~/.hermes-roleplay
+soultavern switch --card alice --home ~/.hermes-roleplay
 
 # Soft-delete a card (moves to cards/.trash/)
-hermes-tavern delete --card bob --home ~/.hermes-roleplay
+soultavern delete --card bob --home ~/.hermes-roleplay
 
 # Bring it back
-hermes-tavern restore --card bob --home ~/.hermes-roleplay
+soultavern restore --card bob --home ~/.hermes-roleplay
 
 # SOUL.md / HERMES.md snapshot history (every import/switch is captured)
-hermes-tavern history --home ~/.hermes-roleplay
+soultavern history --home ~/.hermes-roleplay
 
 # Revert SOUL.md / HERMES.md to a snapshot
-hermes-tavern revert --home ~/.hermes-roleplay --to pristine    # back to before any card
-hermes-tavern revert --home ~/.hermes-roleplay --to alice       # back to when alice was active
-hermes-tavern revert --home ~/.hermes-roleplay --to 0003        # back to snapshot 0003
-hermes-tavern revert --home ~/.hermes-roleplay --previous       # one snapshot back
+soultavern revert --home ~/.hermes-roleplay --to pristine    # back to before any card
+soultavern revert --home ~/.hermes-roleplay --to alice       # back to when alice was active
+soultavern revert --home ~/.hermes-roleplay --to 0003        # back to snapshot 0003
+soultavern revert --home ~/.hermes-roleplay --previous       # one snapshot back
 ```
 
 For `switch` / `delete` / `restore`, the `--card` argument is matched in
@@ -200,7 +227,7 @@ behavior, `--card` resolution rules) is in
 ## Oversized card procedure
 
 When the rendered SOUL.md or HERMES.md would exceed 75% of Hermes's
-20k slot budget (≥ 15,000 chars), `hermes-tavern import` does **not**
+20k slot budget (≥ 15,000 chars), `soultavern import` does **not**
 shell out to any LLM. Instead it stages the source material on disk and
 asks the agent (you) to redistribute it into V2 categories. The flow:
 
@@ -264,7 +291,7 @@ Open `cards/<stem>/source.md` and redistribute its content into up to
 ### Step 3 — run `finalize`
 
 ```bash
-hermes-tavern finalize --card <name> --home <home>
+soultavern finalize --card <name> --home <home>
 ```
 
 This:
@@ -332,7 +359,8 @@ See `references/security.md` for the full threat model and what is
 - `references/security.md` — threat model, sanitiser layers, operator workflow
 - `references/oversized-cards.md` — agent-driven categorization flow, file layout, failure modes
 - `references/library-layout.md` — `<HERMES_HOME>/cards/` schema, snapshots, `--card` resolution
-- `references/openclaw-target.md` — OpenClaw target spike findings + step-3 design baseline (preview; OpenClaw target lands in v0.7)
+- `references/openclaw-target.md` — OpenClaw target spike findings + design baseline
+- `references/openclaw-identity-directive.md` — OpenClaw IDENTITY DIRECTIVE wording + iteration playbook
 
 ## Files this skill writes
 

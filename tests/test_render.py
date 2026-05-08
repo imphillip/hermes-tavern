@@ -2,8 +2,8 @@ from pathlib import Path
 
 import pytest
 
-from hermes_tavern.parse import load_card
-from hermes_tavern.render import BudgetExceededError, render
+from soultavern.parse import load_card
+from soultavern.render import BudgetExceededError, render
 
 
 def test_render_minimal(fixtures_dir: Path):

@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from hermes_tavern.classify import (
+from soultavern.classify import (
     CATEGORIES,
     CATEGORY_DESCRIPTIONS,
     CATEGORY_TITLES,

@@ -1,4 +1,4 @@
-from hermes_tavern.substitute import substitute
+from soultavern.substitute import substitute
 
 
 def test_basic_replacements():

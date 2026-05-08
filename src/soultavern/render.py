@@ -43,7 +43,7 @@ def _quote_block(text: str) -> str:
 
 def _env(char_name: str, user_noun: str) -> Environment:
     env = Environment(
-        loader=PackageLoader("hermes_tavern", "templates"),
+        loader=PackageLoader("soultavern", "templates"),
         autoescape=select_autoescape(disabled_extensions=("j2",), default=False),
         keep_trailing_newline=True,
         trim_blocks=False,
@@ -126,11 +126,66 @@ def render(
 
     hermes_text: str | None = None
     truncated = 0
-    book = data.get("character_book") if include_hermes_md else None
-    if isinstance(book, dict):
-        entries = _book_entries(book)
-        hermes_text, truncated = _render_hermes(env, book, entries, name, target=target)
+    # Managed-section targets (OpenClaw) render their companion file via
+    # a different path in library — the template signature differs (it
+    # takes extended_files, not book/entries) and the file is written
+    # via apply_managed_section rather than full overwrite. Skip
+    # companion rendering here for those targets.
+    if target.companion_write_mode == "replace":
+        book = data.get("character_book") if include_hermes_md else None
+        if isinstance(book, dict):
+            entries = _book_entries(book)
+            hermes_text, truncated = _render_hermes(env, book, entries, name, target=target)
     return RenderResult(soul=soul, hermes=hermes_text, truncated_entries=truncated)
+
+
+def render_managed_companion(
+    char_name: str,
+    user_noun: str,
+    extended_files: list,
+    *,
+    target: Target,
+) -> str:
+    """Render the inner content of a managed-section companion file
+    (e.g. OpenClaw's AGENTS.md). Returns just the inside content; the
+    caller wraps it with markers via ``apply_managed_section``.
+
+    Only applicable when ``target.companion_write_mode ==
+    "managed-section"``. Raises ``ValueError`` for replace-mode targets
+    (which should use the normal ``render()`` path)."""
+    if target.companion_write_mode != "managed-section":
+        raise ValueError(
+            f"render_managed_companion only applies to managed-section "
+            f"targets; got {target.name!r} with mode "
+            f"{target.companion_write_mode!r}",
+        )
+    env = _env(char_name, user_noun)
+    text = env.get_template(target.companion_template).render(
+        char_name=char_name,
+        user_noun=user_noun,
+        extended_files=extended_files,
+    )
+    return _collapse_blank_lines(text)
+
+
+def render_extra_file(
+    extra_file,
+    data: dict[str, Any],
+    *,
+    char_name: str,
+    user_noun: str,
+    avatar_path: str = "",
+) -> str:
+    """Render one of the target's extra files (e.g. OpenClaw's
+    IDENTITY.md). Returns the full file content."""
+    env = _env(char_name, user_noun)
+    text = env.get_template(extra_file.template).render(
+        data=data,
+        char_name=char_name,
+        user_noun=user_noun,
+        avatar_path=avatar_path,
+    )
+    return _collapse_blank_lines(text)
 
 
 def render_curated_soul(

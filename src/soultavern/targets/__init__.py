@@ -12,7 +12,7 @@ For now (v0.6 alpha) only ``hermes`` is implemented; ``openclaw`` and
 
 Usage::
 
-    from hermes_tavern.targets import TARGETS, DEFAULT_TARGET
+    from soultavern.targets import TARGETS, DEFAULT_TARGET
     target = TARGETS["hermes"]
     soul_filename = target.soul_filename       # "SOUL.md"
     template = target.soul_template            # "SOUL.md.j2"

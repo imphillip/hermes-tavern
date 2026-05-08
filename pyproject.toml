@@ -3,14 +3,14 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "hermes-tavern"
-version = "0.5.1"
-description = "Import SillyTavern V2 character cards into Hermes-Agent as SOUL.md + HERMES.md."
+name = "soultavern"
+version = "1.0.0"
+description = "Import SillyTavern V2 character cards into multiple agent runtimes (Hermes / OpenClaw) as SOUL.md + companion files."
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.10"
-authors = [{ name = "HermesTavern contributors" }]
-keywords = ["hermes", "sillytavern", "character-card", "roleplay", "tavernai", "persona"]
+authors = [{ name = "SoulTavern contributors" }]
+keywords = ["soultavern", "hermes", "openclaw", "sillytavern", "character-card", "roleplay", "tavernai", "persona"]
 classifiers = [
   "License :: OSI Approved :: MIT License",
   "Programming Language :: Python :: 3",
@@ -30,20 +30,24 @@ dependencies = [
 dev = ["pytest>=7", "ruff>=0.4", "mypy>=1.8"]
 
 [project.urls]
-Homepage = "https://github.com/imphillip/hermes-tavern"
+Homepage = "https://github.com/imphillip/SoulTavern"
 
 [project.scripts]
-hermes-tavern = "hermes_tavern.cli:main"
+soultavern = "soultavern.cli:main"
+# Backward-compat: pre-v1.0 the binary was `hermes-tavern`. Same entry
+# point, identical behavior — `--target hermes` is the default, so
+# existing scripts work unchanged.
+hermes-tavern = "soultavern.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["hermes_tavern*"]
+include = ["soultavern*"]
 
 [tool.setuptools.package-dir]
 "" = "src"
 
 [tool.setuptools.package-data]
-"hermes_tavern" = ["templates/*.j2"]
+"soultavern" = ["templates/*.j2"]
 
 [tool.ruff]
 line-length = 100

@@ -1,0 +1,25 @@
+{# OpenClaw AGENTS.md managed-section content.
+
+   This template renders the INNER content of the managed section
+   (between the BEGIN/END markers). The marker comments themselves
+   are added by `targets.openclaw_writers.apply_managed_section()`,
+   which also handles the append-or-replace logic for the file as a
+   whole.
+
+   Variables:
+   - char_name: the imported character's name
+   - user_noun: how to address the user
+   - extended_files: list of ExtendedFile records for the lore index
+                     (may be empty for cards with no character_book)
+#}
+{% include "_identity_directive.openclaw.j2" %}
+{% if extended_files %}
+
+## Lore index
+
+The following files contain extended persona / world content for {{ char_name }}. Read them with your file tools when the conversation calls for specifics that aren't already in `SOUL.md`.
+
+{% for entry in extended_files -%}
+- `{{ entry.relative_path }}` — {{ entry.title }}: {{ entry.summary }}
+{% endfor -%}
+{% endif %}

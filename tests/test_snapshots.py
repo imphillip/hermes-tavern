@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from hermes_tavern import library, snapshots
+from soultavern import library, snapshots
 
 
 def test_first_import_creates_pristine_then_snapshot(home: Path, fixtures_dir: Path):
@@ -162,7 +162,7 @@ def test_finalize_path_also_snapshots(home: Path, tmp_path: Path):
     HERMES.md."""
     import pytest as _pytest
 
-    from hermes_tavern.staging import NeedsAgentCategorizationError
+    from soultavern.staging import NeedsAgentCategorizationError
 
     big = tmp_path / "big.json"
     big.write_text(

@@ -67,6 +67,10 @@ from .render import BudgetExceededError, RenderResult, render
 from .snapshots import Snapshot
 from .staging import NeedsAgentCategorizationError
 from .targets import DEFAULT_TARGET, Target
+from .targets.openclaw_writers import (
+    apply_managed_section,
+    strip_managed_section,
+)
 
 # Re-export so callers don't need to reach into staging.
 __all__ = [
@@ -413,7 +417,9 @@ def _write_outputs_finalized(
     overwrite: bool,
     target: Target = DEFAULT_TARGET,
 ) -> None:
-    """Finalize-mode write: curated SOUL.md + indexed companion file."""
+    """Finalize-mode write for replace-mode targets (Hermes): curated
+    SOUL.md + indexed companion file. Both files are target-owned and
+    fully overwritten."""
     soul_p = soul_path(home, target)
     hermes_p = hermes_path(home, target)
     if not overwrite:
@@ -421,6 +427,130 @@ def _write_outputs_finalized(
     home.mkdir(parents=True, exist_ok=True)
     soul_p.write_text(soul, "utf-8")
     hermes_p.write_text(hermes, "utf-8")
+
+
+def _read_or_empty(path: Path) -> str:
+    """Best-effort file read for managed-section append. Empty string
+    if the file doesn't exist."""
+    try:
+        return path.read_text("utf-8")
+    except FileNotFoundError:
+        return ""
+
+
+def _write_managed_section_outputs(
+    home: Path,
+    data: dict[str, Any],
+    *,
+    soul_text: str,
+    char_name: str,
+    user_noun: str,
+    overwrite: bool,
+    target: Target,
+) -> tuple[bool, int]:
+    """Write outputs for a managed-section target (OpenClaw).
+
+    Steps:
+    1. Write SOUL.md (replace, target-owned)
+    2. Write per-entry lorebook payloads under cards/<stem>/extended/
+       (always — managed-section targets reach for full prose via the
+       index even on small cards)
+    3. Render the managed section (IDENTITY DIRECTIVE + lore index)
+       and apply it into the companion file (AGENTS.md), preserving
+       any user content outside the section markers
+    4. Render and write each ``target.extra_files`` (e.g. IDENTITY.md)
+
+    Returns ``(wrote_companion, extended_files_count)``.
+    """
+    home.mkdir(parents=True, exist_ok=True)
+    soul_p = soul_path(home, target)
+    if not overwrite:
+        _check_no_existing(home, soul_p)
+    soul_p.write_text(soul_text, "utf-8")
+
+    # Lorebook + alternate_greetings → cards/<stem>/extended/
+    # We need a stem to namespace the per-card extended dir; compute
+    # it from the active record's pending card_file (caller passes via
+    # data["__card_file__"]). Fallback: use the data name slug.
+    card_file = data.get("__card_file__")
+    if card_file:
+        extended_dir = _extended_dir_for(card_file, home)
+    else:
+        # Standalone render (validate / dry-run) — write to a temp-like
+        # cards/<slug>/extended/ that's still under home.
+        slug = re.sub(r"[^A-Za-z0-9_.-]+", "_", char_name) or "card"
+        extended_dir = home / "cards" / slug / "extended"
+    extended_mod.write_lorebook_payloads(extended_dir, data, user_noun=user_noun)
+
+    extended_files = extended_mod.collect_extended_files(home, extended_dir, char_name)
+
+    # Render managed section + apply
+    inner = render_mod.render_managed_companion(
+        char_name=char_name, user_noun=user_noun,
+        extended_files=extended_files, target=target,
+    )
+    if len(inner) > target.companion_budget:
+        # Soft warning via BudgetExceededError — caller can catch.
+        raise BudgetExceededError(
+            f"{target.companion_filename} managed section",
+            len(inner), target.companion_budget,
+        )
+    companion_p = home / target.companion_filename
+    existing = _read_or_empty(companion_p)
+    new_companion = apply_managed_section(
+        existing, inner, marker=target.companion_section_marker,
+    )
+    companion_p.write_text(new_companion, "utf-8")
+
+    # Extra files
+    for extra in target.extra_files:
+        extra_p = home / extra.filename
+        if not overwrite and extra_p.exists():
+            raise AlreadyExistsError(
+                f"{extra.filename} already exists; pass --overwrite to replace"
+            )
+        rendered_extra = render_mod.render_extra_file(
+            extra, data, char_name=char_name, user_noun=user_noun,
+        )
+        if len(rendered_extra) > extra.budget:
+            raise BudgetExceededError(
+                extra.filename, len(rendered_extra), extra.budget,
+            )
+        extra_p.write_text(rendered_extra, "utf-8")
+
+    return True, len(extended_files)
+
+
+def _strip_managed_section_outputs(home: Path, target: Target) -> None:
+    """Inverse of _write_managed_section_outputs for delete/revert.
+
+    Removes:
+    - SOUL.md (target-owned, full unlink)
+    - the managed section from the companion file (preserves user content;
+      unlinks the file if managed section was the only content)
+    - each extra_files entry
+
+    Used by delete_card on managed-section targets.
+    """
+    soul_p = soul_path(home, target)
+    if soul_p.exists():
+        soul_p.unlink()
+
+    companion_p = home / target.companion_filename
+    if companion_p.exists():
+        existing = companion_p.read_text("utf-8")
+        stripped = strip_managed_section(
+            existing, marker=target.companion_section_marker,
+        )
+        if stripped:
+            companion_p.write_text(stripped, "utf-8")
+        else:
+            companion_p.unlink()
+
+    for extra in target.extra_files:
+        extra_p = home / extra.filename
+        if extra_p.exists():
+            extra_p.unlink()
 
 
 def apply_card(
@@ -481,16 +611,44 @@ def apply_card(
             raise BudgetExceededError(
                 target.soul_filename, len(rendered.soul), target.soul_budget,
             )
-        if rendered.hermes is not None and len(rendered.hermes) > target.companion_budget:
-            raise BudgetExceededError(
-                target.companion_filename,
-                len(rendered.hermes),
-                target.companion_budget,
+
+        if target.companion_write_mode == "replace":
+            # Hermes path: SOUL.md + optional HERMES.md, both target-owned
+            if rendered.hermes is not None and len(rendered.hermes) > target.companion_budget:
+                raise BudgetExceededError(
+                    target.companion_filename,
+                    len(rendered.hermes),
+                    target.companion_budget,
+                )
+            wrote_hermes = _write_outputs_normal(
+                home, rendered, overwrite=overwrite, write_hermes=not soul_only,
+                target=target,
             )
-        wrote_hermes = _write_outputs_normal(
-            home, rendered, overwrite=overwrite, write_hermes=not soul_only,
-            target=target,
-        )
+            extended_files_count = 0
+        else:
+            # Managed-section path (OpenClaw): SOUL.md + AGENTS.md
+            # managed section + extra_files (IDENTITY.md) +
+            # cards/<stem>/extended/ lore payloads
+            if soul_only:
+                # --soul-only on managed-section targets writes SOUL.md
+                # only. No AGENTS.md touch, no IDENTITY.md, no extended/.
+                home.mkdir(parents=True, exist_ok=True)
+                soul_p = soul_path(home, target)
+                if not overwrite:
+                    _check_no_existing(home, soul_p)
+                soul_p.write_text(rendered.soul, "utf-8")
+                wrote_hermes = False
+                extended_files_count = 0
+            else:
+                data_with_card_file = dict(data)
+                data_with_card_file["__card_file__"] = card_path.name
+                wrote_hermes, extended_files_count = _write_managed_section_outputs(
+                    home, data_with_card_file,
+                    soul_text=rendered.soul,
+                    char_name=char_name, user_noun=user_noun,
+                    overwrite=overwrite, target=target,
+                )
+
         record = ActiveRecord(
             name=char_name,
             card_file=card_path.name,
@@ -512,7 +670,10 @@ def apply_card(
             hermes=hermes_path(home, target),
             active_record=asdict(record),
         )
-        return ApplyOutcome(rendered=rendered, wrote_hermes_md=wrote_hermes, finalized=False)
+        return ApplyOutcome(
+            rendered=rendered, wrote_hermes_md=wrote_hermes,
+            finalized=False, extended_files=extended_files_count,
+        )
 
     # Oversized. If the agent has already written V2 categories, finalize
     # straight from disk (this is the switch_to-an-already-finalized path).
@@ -571,11 +732,52 @@ def _finalize_in_place(
         char_name, classification, user_noun=user_noun, target=target,
     )
     extended_files = extended_mod.collect_extended_files(home, extended_dir, char_name)
-    hermes_md = extended_mod.render_indexed_hermes_md(char_name, extended_files)
 
-    _write_outputs_finalized(
-        home, soul=soul_md, hermes=hermes_md, overwrite=overwrite, target=target,
-    )
+    if target.companion_write_mode == "replace":
+        # Hermes path: full HERMES.md indexed companion
+        hermes_md = extended_mod.render_indexed_hermes_md(char_name, extended_files)
+        _write_outputs_finalized(
+            home, soul=soul_md, hermes=hermes_md, overwrite=overwrite, target=target,
+        )
+    else:
+        # Managed-section path (OpenClaw): SOUL.md replace +
+        # AGENTS.md managed section + IDENTITY.md
+        home.mkdir(parents=True, exist_ok=True)
+        soul_p = soul_path(home, target)
+        if not overwrite:
+            _check_no_existing(home, soul_p)
+        soul_p.write_text(soul_md, "utf-8")
+
+        inner = render_mod.render_managed_companion(
+            char_name=char_name, user_noun=user_noun,
+            extended_files=extended_files, target=target,
+        )
+        if len(inner) > target.companion_budget:
+            raise BudgetExceededError(
+                f"{target.companion_filename} managed section",
+                len(inner), target.companion_budget,
+            )
+        companion_p = home / target.companion_filename
+        existing = _read_or_empty(companion_p)
+        new_companion = apply_managed_section(
+            existing, inner, marker=target.companion_section_marker,
+        )
+        companion_p.write_text(new_companion, "utf-8")
+
+        for extra in target.extra_files:
+            extra_p = home / extra.filename
+            if not overwrite and extra_p.exists():
+                raise AlreadyExistsError(
+                    f"{extra.filename} already exists; pass --overwrite to replace"
+                )
+            rendered_extra = render_mod.render_extra_file(
+                extra, data, char_name=char_name, user_noun=user_noun,
+            )
+            if len(rendered_extra) > extra.budget:
+                raise BudgetExceededError(
+                    extra.filename, len(rendered_extra), extra.budget,
+                )
+            extra_p.write_text(rendered_extra, "utf-8")
 
     record = ActiveRecord(
         name=char_name,
@@ -699,9 +901,17 @@ def delete_card(home: Path, query: str) -> Path:
     The card's per-card directory (``cards/<stem>/``, holding ``extended/``
     + ``source.md``) is moved alongside the card payload so restore brings
     everything back.
+
+    For managed-section targets (OpenClaw): if the deleted card was
+    active, the SoulTavern-managed section is stripped from the
+    companion file (preserving any user content outside markers) and
+    extra files are cleaned. SOUL.md is removed in either case.
     """
     ensure_layout(home)
     src = find_card(home, query)
+    active = read_active(home)
+    was_active = active is not None and active.card_file == src.name
+
     dest = trash_dir(home) / src.name
     if dest.exists():
         dest.unlink()
@@ -712,8 +922,13 @@ def delete_card(home: Path, query: str) -> Path:
         if trash_stem.exists():
             shutil.rmtree(trash_stem)
         shutil.move(str(stem_dir), str(trash_stem))
-    active = read_active(home)
-    if active and active.card_file == src.name:
+
+    if was_active:
+        # For managed-section targets, restore companion + clean extras
+        # before clearing the active record.
+        active_target = _target_for(active.target if active else "hermes")
+        if active_target.companion_write_mode == "managed-section":
+            _strip_managed_section_outputs(home, active_target)
         clear_active(home)
     return dest
 

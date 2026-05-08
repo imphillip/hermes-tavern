@@ -20,12 +20,12 @@ jobs:
       - name: Verify bundled wheel matches pyproject version
         run: |
           PYPROJECT_VERSION=$(grep -E '^version\s*=\s*"' pyproject.toml | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
-          BUNDLED_WHEEL=$(ls skills/hermes-tavern/assets/hermes_tavern-*.whl 2>/dev/null | head -1)
+          BUNDLED_WHEEL=$(ls skills/soultavern/assets/soultavern-*.whl 2>/dev/null | head -1)
           if [ -z "$BUNDLED_WHEEL" ]; then
-            echo "::error::No bundled wheel found in skills/hermes-tavern/assets/"
+            echo "::error::No bundled wheel found in skills/soultavern/assets/"
             exit 1
           fi
-          BUNDLED_VERSION=$(basename "$BUNDLED_WHEEL" | sed -E 's/^hermes_tavern-([^-]+)-.*$/\1/')
+          BUNDLED_VERSION=$(basename "$BUNDLED_WHEEL" | sed -E 's/^soultavern-([^-]+)-.*$/\1/')
           TAG_VERSION="${GITHUB_REF#refs/tags/v}"
           echo "pyproject:  $PYPROJECT_VERSION"
           echo "bundled:    $BUNDLED_VERSION"
@@ -37,12 +37,12 @@ jobs:
 
       - name: Build skills zip
         run: |
-          zip -r hermes-tavern-skills.zip skills/ -x '*.DS_Store'
-          ls -lh hermes-tavern-skills.zip
+          zip -r soultavern-skills.zip skills/ -x '*.DS_Store'
+          ls -lh soultavern-skills.zip
 
       - name: Locate bundled wheel
         id: wheel
-        run: echo "path=$(ls skills/hermes-tavern/assets/hermes_tavern-*.whl)" >> "$GITHUB_OUTPUT"
+        run: echo "path=$(ls skills/soultavern/assets/soultavern-*.whl)" >> "$GITHUB_OUTPUT"
 
       - name: Create release with assets
         env:
@@ -50,7 +50,7 @@ jobs:
         run: |
           TAG="${GITHUB_REF#refs/tags/}"
           gh release create "$TAG" \
-            hermes-tavern-skills.zip \
+            soultavern-skills.zip \
             "${{ steps.wheel.outputs.path }}" \
             --title "$TAG" \
             --generate-notes

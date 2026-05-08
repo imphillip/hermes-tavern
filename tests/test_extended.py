@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from hermes_tavern.extended import (
+from soultavern.extended import (
     ExtendedFile,
     collect_extended_files,
     render_indexed_hermes_md,

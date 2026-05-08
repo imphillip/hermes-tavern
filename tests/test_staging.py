@@ -11,8 +11,8 @@ from pathlib import Path
 
 import pytest
 
-from hermes_tavern import library
-from hermes_tavern.staging import (
+from soultavern import library
+from soultavern.staging import (
     NeedsAgentCategorizationError,
     format_source_for_agent,
     write_source_md,

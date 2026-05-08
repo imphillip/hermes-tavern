@@ -86,7 +86,7 @@ full spike findings, design rationale, and what's locked vs open.
 
 from __future__ import annotations
 
-from .base import Target
+from .base import ExtraFile, Target
 
 OPENCLAW = Target(
     name="openclaw",
@@ -98,5 +98,15 @@ OPENCLAW = Target(
     soul_budget=11_000,
     companion_budget=6_000,
     oversize_threshold=9_000,
-    implemented=False,
+    implemented=True,
+    companion_write_mode="managed-section",
+    companion_section_marker="soultavern:character",
+    extra_files=(
+        ExtraFile(
+            filename="IDENTITY.md",
+            template="IDENTITY.md.openclaw.j2",
+            budget=2_000,
+            description="character metadata (name / vibe / avatar)",
+        ),
+    ),
 )

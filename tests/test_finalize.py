@@ -14,8 +14,8 @@ from pathlib import Path
 
 import pytest
 
-from hermes_tavern import library
-from hermes_tavern.staging import NeedsAgentCategorizationError
+from soultavern import library
+from soultavern.staging import NeedsAgentCategorizationError
 
 
 def _bloated_payload(name: str = "Bloat") -> dict:

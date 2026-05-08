@@ -2,8 +2,8 @@
 
 from pathlib import Path
 
-from hermes_tavern.parse import load_card
-from hermes_tavern.render import render
+from soultavern.parse import load_card
+from soultavern.render import render
 
 
 def test_soul_md_has_trust_boundary_banner(fixtures_dir: Path):

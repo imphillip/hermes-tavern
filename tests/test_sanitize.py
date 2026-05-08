@@ -1,4 +1,4 @@
-from hermes_tavern.sanitize import find_long_unbroken_tokens, sanitize
+from soultavern.sanitize import find_long_unbroken_tokens, sanitize
 
 
 def test_strips_zero_width_chars():

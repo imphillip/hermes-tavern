@@ -1,4 +1,4 @@
-from hermes_tavern.scan import scan_card
+from soultavern.scan import scan_card
 
 
 def categories(findings):

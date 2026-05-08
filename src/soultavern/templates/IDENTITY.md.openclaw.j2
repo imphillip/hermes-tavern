@@ -1,0 +1,28 @@
+{# OpenClaw IDENTITY.md template — character metadata.
+
+   Replaces OpenClaw's default IDENTITY.md with the imported
+   character's name + signal data. Tiny file; falls well under the
+   12k per-file cap.
+
+   Variables:
+   - data: parsed V2 card
+   - avatar_path: optional avatar location (workspace-relative path,
+                  http(s) URL, or data URI). Empty string if absent.
+#}
+# IDENTITY.md - Who Am I?
+
+- **Name:** {{ data.name }}
+- **Creature:** roleplay character (imported from a SillyTavern V2 card)
+{%- if data.tags %}
+- **Vibe:** {{ data.tags | join(", ") }}
+{%- endif %}
+- **Avatar:** {{ avatar_path or "_(see source card backup)_" }}
+
+---
+
+This identity was set by SoulTavern when the character was imported.
+The active-character takeover is enforced by the IDENTITY DIRECTIVE
+in `AGENTS.md`; this file is the metadata record.
+
+To switch to a different character: `soultavern switch --card <name>`.
+To go back to the default agent identity: `soultavern revert --to pristine`.

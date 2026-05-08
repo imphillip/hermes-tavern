@@ -14,9 +14,9 @@ script.
 """
 from pathlib import Path
 
-from hermes_tavern.extended import ExtendedFile, render_indexed_hermes_md
-from hermes_tavern.parse import load_card
-from hermes_tavern.render import render
+from soultavern.extended import ExtendedFile, render_indexed_hermes_md
+from soultavern.parse import load_card
+from soultavern.render import render
 
 
 def test_soul_md_carries_directors_notes(fixtures_dir: Path):

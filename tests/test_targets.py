@@ -13,10 +13,10 @@ from pathlib import Path
 
 import pytest
 
-from hermes_tavern import library
-from hermes_tavern.cli import main
-from hermes_tavern.render import HERMES_BUDGET, SOUL_BUDGET
-from hermes_tavern.targets import (
+from soultavern import library
+from soultavern.cli import main
+from soultavern.render import HERMES_BUDGET, SOUL_BUDGET
+from soultavern.targets import (
     DEFAULT_TARGET,
     GENERIC,
     HERMES,
@@ -32,14 +32,14 @@ def test_registry_resolves_hermes_by_name():
     assert isinstance(TARGETS["hermes"], Target)
 
 
-def test_registry_includes_skeleton_targets():
-    """openclaw and generic are registered for CLI discovery, even though
-    their templates aren't implemented in v0.6.x."""
+def test_registry_includes_all_targets():
+    """All three targets registered. Hermes + OpenClaw functional in
+    v1.0; generic still skeleton."""
     assert TARGETS["openclaw"] is OPENCLAW
     assert TARGETS["generic"] is GENERIC
-    assert OPENCLAW.implemented is False
-    assert GENERIC.implemented is False
     assert HERMES.implemented is True
+    assert OPENCLAW.implemented is True
+    assert GENERIC.implemented is False  # skeleton — lands later
 
 
 def test_openclaw_target_uses_agents_md_as_companion():
@@ -133,28 +133,9 @@ def test_cli_explicit_hermes_target_works(
     assert (home / "SOUL.md").exists()
 
 
-def test_cli_openclaw_target_rejected_with_friendly_message(
-    tmp_path: Path, fixtures_dir: Path, capsys: pytest.CaptureFixture[str],
-):
-    """openclaw is registered for discoverability but unimplemented in
-    v0.6.x — must reject before doing any filesystem work, with a
-    message that points users at the migration roadmap."""
-    home = tmp_path / "home"
-    with pytest.raises(SystemExit) as exc:
-        main([
-            "import",
-            "--card", str(fixtures_dir / "v2_minimal.json"),
-            "--home", str(home),
-            "--target", "openclaw",
-        ])
-    msg = str(exc.value)
-    assert "openclaw" in msg
-    assert "not yet implemented" in msg
-    # No partial state left on disk
-    assert not (home / "SOUL.md").exists()
-
-
 def test_cli_generic_target_rejected(tmp_path: Path, fixtures_dir: Path):
+    """Generic is still a skeleton in v1.0 — must reject before doing
+    any filesystem work."""
     home = tmp_path / "home"
     with pytest.raises(SystemExit) as exc:
         main([

@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from hermes_tavern.parse import (
+from soultavern.parse import (
     InvalidCardError,
     UnsupportedCardError,
     load_card,

@@ -1,23 +1,31 @@
-# HermesTavern
+# SoulTavern
 
 [English](README.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-> Run your SillyTavern characters in a Hermes agent.
+> Run your SillyTavern characters in any agent runtime that loads a SOUL.md.
 
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-HermesTavern is a one-shot importer that turns SillyTavern V2 character
-cards (`.png` / `.json` / `.yaml`) into the two markdown files that
-[Hermes-Agent](https://github.com/NousResearch/hermes-agent) loads at
-startup as identity and project-context: `SOUL.md` and `HERMES.md`.
+SoulTavern is a one-shot importer that turns SillyTavern V2 character
+cards (`.png` / `.json` / `.yaml`) into the markdown system-prompt
+files an agent runtime loads at startup. v1.0 ships with two
+functional targets: `--target hermes` (writes `SOUL.md` + `HERMES.md`
+for [Hermes-Agent](https://github.com/NousResearch/hermes-agent)) and
+`--target openclaw` (writes `SOUL.md` + `AGENTS.md` managed-section +
+`IDENTITY.md` for an [OpenClaw](https://github.com/imphillip/openclaw)
+workspace).
 
 No middleware, no patches, no relays. Drop a card in, get the markdown
-out, point Hermes at it, and your agent is in character — across every
-gateway you've already configured (CLI, email, Telegram, Discord,
-Slack, …).
+out, point your agent at it, and it's in character — across every
+gateway already configured (CLI, email, Telegram, Discord, Slack, …).
 
-**Lineage:** `TavernAI` → `SillyTavern` → **`HermesTavern`** → **`SoulTavern`** *(in progress)*
+**Lineage:** `TavernAI` → `SillyTavern` → `HermesTavern` → **`SoulTavern`**
+
+> SoulTavern v1.0 is the rebrand-and-generalize of HermesTavern (≤
+> v0.5.x). The CLI binary is now `soultavern`, with `hermes-tavern`
+> kept as a backward-compat alias. The default `--target hermes`
+> reproduces the v0.5.x behavior unchanged.
 
 ---
 
@@ -27,10 +35,12 @@ HermesTavern is the first concrete instance of a broader direction:
 let any agent runtime that loads a persistent persona file at session
 start pick up the entire SillyTavern card ecosystem.
 
-We're generalizing this into **SoulTavern** — a multi-target adapter
-starting with `--target hermes` (this project, unchanged) and adding
-`--target openclaw` plus a generic SOUL.md fallback. The rename
-happens at v1.0; until then, `hermes-tavern` keeps working as today.
+We're generalizing this into **SoulTavern** — a multi-target adapter.
+v1.0 ships with two functional targets: `--target hermes` (default;
+the v0.5.x behavior unchanged) and `--target openclaw` (writes
+`SOUL.md` + `AGENTS.md` managed-section + `IDENTITY.md` into an
+OpenClaw workspace). A `--target generic` fallback for unspecified
+runtimes is registered as a skeleton and lands in a later release.
 
 ### Three principles
 
@@ -88,17 +98,17 @@ clarify in plain language — Hermes handles the rest.
 ## Install
 
 **Easiest** — download the pre-built zip from the
-[latest Release](https://github.com/imphillip/hermes-tavern/releases/latest):
+[latest Release](https://github.com/imphillip/SoulTavern/releases/latest):
 
 ```bash
-curl -LO https://github.com/imphillip/hermes-tavern/releases/latest/download/hermes-tavern-skills.zip
+curl -LO https://github.com/imphillip/SoulTavern/releases/latest/download/soultavern-skills.zip
 ```
 
 (Or grab it via your browser from the Releases page.)
 
-Then in your Hermes chat, upload `hermes-tavern-skills.zip` and say
+Then in your Hermes chat, upload `soultavern-skills.zip` and say
 **"install this skill"**. The bundled wheel inside puts the
-`hermes-tavern` CLI on PATH automatically.
+`soultavern` CLI on PATH automatically.
 
 From here on, every interaction is just upload-and-talk as shown above.
 
@@ -107,8 +117,8 @@ From here on, every interaction is just upload-and-talk as shown above.
 If you want unreleased changes (e.g. tracking `main`):
 
 ```bash
-git clone https://github.com/imphillip/hermes-tavern.git
-cd hermes-tavern && zip -r hermes-tavern-skills.zip skills/
+git clone https://github.com/imphillip/SoulTavern.git
+cd SoulTavern && zip -r soultavern-skills.zip skills/
 ```
 
 Zip the whole `skills/` directory, not individual sub-skills —
@@ -120,8 +130,8 @@ your Hermes chat as above.
 If your Hermes is set up with the hub `tap` system:
 
 ```bash
-hermes skills tap add imphillip/hermes-tavern
-hermes skills install hermes-tavern
+hermes skills tap add imphillip/SoulTavern
+hermes skills install soultavern
 ```
 
 ### Bootstrap: installing the CLI on the host
@@ -131,15 +141,15 @@ Only needed when Hermes itself isn't around to do the install for you
 different host):
 
 ```bash
-git clone https://github.com/imphillip/hermes-tavern.git && cd hermes-tavern
-bash skills/hermes-tavern/scripts/install.sh
+git clone https://github.com/imphillip/SoulTavern.git && cd SoulTavern
+bash skills/soultavern/scripts/install.sh
 ```
 
 Idempotent — tries `pipx` → `uv tool` → a dedicated venv at
-`~/.local/share/hermes-tavern-venv` with a shim in `~/.local/bin`.
-Override with `HERMES_TAVERN_VENV` / `HERMES_TAVERN_BIN`. When
-`hermes-tavern` lands on PyPI, this collapses to
-`pipx install hermes-tavern` and the bundled wheels go away.
+`~/.local/share/soultavern-venv` with a shim in `~/.local/bin`.
+Override with `SOULTAVERN_VENV` / `SOULTAVERN_BIN`. When
+`soultavern` lands on PyPI, this collapses to
+`pipx install soultavern` and the bundled wheels go away.
 
 ### Uninstall
 
@@ -147,7 +157,7 @@ Two layers — the skill (prompt files) and the CLI (system binary). The
 hub command only handles the first:
 
 ```bash
-bash skills/hermes-tavern/scripts/uninstall.sh   # removes the CLI; --dry-run to preview
+bash skills/soultavern/scripts/uninstall.sh   # removes the CLI; --dry-run to preview
 hermes skills uninstall hermes-tavern            # removes the skill
 ```
 
@@ -201,7 +211,7 @@ What we deliberately don't do:
 - **Agent-driven oversized-card flow** — when a card overflows 75% of
   the Hermes 20k slot, `import` stages source material on disk and the
   calling agent redistributes it into V2 categories in its own context
-  (no subprocess LLM call). `hermes-tavern finalize` then assembles the
+  (no subprocess LLM call). `soultavern finalize` then assembles the
   curated SOUL.md and the indexed HERMES.md.
 - **Card library** — list / current / switch / delete / restore over
   the cards imported into a `HERMES_HOME`
@@ -216,33 +226,33 @@ What we deliberately don't do:
 
 ```bash
 # Sanity-check a card (parse + render + scan, no writes)
-hermes-tavern validate --card aldous.png
+soultavern validate --card aldous.png
 
 # Preview the rendered markdown
-hermes-tavern import --card aldous.png --home ~/.hermes-roleplay --dry-run
+soultavern import --card aldous.png --home ~/.hermes-roleplay --dry-run
 
 # Replace an existing persona
-hermes-tavern import --card alice.png --home ~/.hermes-roleplay --overwrite
+soultavern import --card alice.png --home ~/.hermes-roleplay --overwrite
 
 # Library management
-hermes-tavern list    --home ~/.hermes-roleplay [--all]
-hermes-tavern current --home ~/.hermes-roleplay
-hermes-tavern switch  --card alice --home ~/.hermes-roleplay
-hermes-tavern delete  --card bob   --home ~/.hermes-roleplay
-hermes-tavern restore --card bob   --home ~/.hermes-roleplay
+soultavern list    --home ~/.hermes-roleplay [--all]
+soultavern current --home ~/.hermes-roleplay
+soultavern switch  --card alice --home ~/.hermes-roleplay
+soultavern delete  --card bob   --home ~/.hermes-roleplay
+soultavern restore --card bob   --home ~/.hermes-roleplay
 
 # SOUL.md / HERMES.md snapshot history (every import/switch is captured)
-hermes-tavern history --home ~/.hermes-roleplay
-hermes-tavern revert  --home ~/.hermes-roleplay --to pristine     # back to pre-card state
-hermes-tavern revert  --home ~/.hermes-roleplay --previous        # one back
-hermes-tavern revert  --home ~/.hermes-roleplay --to 0003
+soultavern history --home ~/.hermes-roleplay
+soultavern revert  --home ~/.hermes-roleplay --to pristine     # back to pre-card state
+soultavern revert  --home ~/.hermes-roleplay --previous        # one back
+soultavern revert  --home ~/.hermes-roleplay --to 0003
 
 # Trust the card author's system_prompt / post_history_instructions
 # (default is to render them inside untrusted blockquotes)
-hermes-tavern import ... --trust-system-prompt
+soultavern import ... --trust-system-prompt
 
 # After the agent has populated extended/<category>.md for an oversized card
-hermes-tavern finalize --card aldous --home ~/.hermes-roleplay
+soultavern finalize --card aldous --home ~/.hermes-roleplay
 ```
 
 `switch` / `delete` / `restore` accept either a filename or the
@@ -276,7 +286,7 @@ stages the source material on disk, exits with code 2, and asks the
 calling agent to redistribute that material into eight V2-aligned
 categories — faithful to original wording, declining gracefully when
 content conflicts with policy. After the agent writes the category
-files, `hermes-tavern finalize` assembles the final SOUL.md (from a
+files, `soultavern finalize` assembles the final SOUL.md (from a
 small set of always-on picks) and HERMES.md (the category index).
 
 ```
@@ -311,7 +321,7 @@ for those details — that's why `cd $HERMES_HOME` matters even more
 here (HERMES.md is the index that points at the per-category files).
 
 Full procedure, including failure modes and the `finalize` step, lives
-in [`skills/hermes-tavern/references/oversized-cards.md`](skills/hermes-tavern/references/oversized-cards.md).
+in [`skills/soultavern/references/oversized-cards.md`](skills/soultavern/references/oversized-cards.md).
 
 ## Files HermesTavern writes — and never writes
 
@@ -334,44 +344,54 @@ nothing leaks elsewhere.
 The skill is self-documenting; its `SKILL.md` and `references/`
 directory contain the full operator-facing docs.
 
-- [`skills/hermes-tavern/SKILL.md`](skills/hermes-tavern/SKILL.md) —
+- [`skills/soultavern/SKILL.md`](skills/soultavern/SKILL.md) —
   import + library management (list / current / switch / delete /
   restore / history / revert) in one place
 
 **Reference docs**
 
-- [`v2-spec-summary.md`](skills/hermes-tavern/references/v2-spec-summary.md) — V2 card field cheat sheet
-- [`field-mapping.md`](skills/hermes-tavern/references/field-mapping.md) — exact V2 → markdown rules
-- [`usage-recipes.md`](skills/hermes-tavern/references/usage-recipes.md) — common workflows and gotchas
-- [`security.md`](skills/hermes-tavern/references/security.md) — threat model + sanitiser layers
-- [`oversized-cards.md`](skills/hermes-tavern/references/oversized-cards.md) — agent-driven categorization flow for oversized cards
-- [`library-layout.md`](skills/hermes-tavern/references/library-layout.md) — `<HERMES_HOME>/cards/` schema, snapshot history, `--card` resolution
+- [`v2-spec-summary.md`](skills/soultavern/references/v2-spec-summary.md) — V2 card field cheat sheet
+- [`field-mapping.md`](skills/soultavern/references/field-mapping.md) — exact V2 → markdown rules
+- [`usage-recipes.md`](skills/soultavern/references/usage-recipes.md) — common workflows and gotchas
+- [`security.md`](skills/soultavern/references/security.md) — threat model + sanitiser layers
+- [`oversized-cards.md`](skills/soultavern/references/oversized-cards.md) — agent-driven categorization flow for oversized cards
+- [`library-layout.md`](skills/soultavern/references/library-layout.md) — `<HERMES_HOME>/cards/` schema, snapshot history, `--card` resolution
+- [`openclaw-target.md`](skills/soultavern/references/openclaw-target.md) — OpenClaw target file layout, write strategy, budget constants
+- [`openclaw-identity-directive.md`](skills/soultavern/references/openclaw-identity-directive.md) — OpenClaw IDENTITY DIRECTIVE wording + iteration playbook
 
 ## Repository layout
 
 ```
-hermes-tavern/
-├── src/hermes_tavern/             Python package (the engine; bundled wheel until PyPI)
+SoulTavern/
+├── src/soultavern/                Python package (the engine; bundled wheel until PyPI)
 ├── tests/                         pytest suite (incl. real-card smoke)
 ├── examples/                      local third-party cards (gitignored)
 └── skills/                        Hermes-hub-discoverable skills tree
-    └── hermes-tavern/             one skill: import + library management
+    └── soultavern/                one skill: import + library management
         ├── SKILL.md
-        ├── references/            6 reference docs
+        ├── references/            8 reference docs
         ├── scripts/               skill entry wrappers + install.sh
         └── assets/                bundled wheel + sample V2 card
 ```
 
+> **v1.0.0 rename.** Pre-v1.0 the project was named **HermesTavern**
+> (single-target, Hermes-Agent only). v1.0 rebrands as **SoulTavern**
+> with multi-target support (`--target hermes` and `--target openclaw`).
+> The Python package is now `soultavern`; the CLI binary is now
+> `soultavern` (with `hermes-tavern` retained as a backward-compat
+> alias). If your `hermes skills list` still shows `hermes-tavern`,
+> run `hermes skills uninstall hermes-tavern` and reinstall via the
+> instructions above.
+
 > **v0.5.0 note.** Earlier versions shipped a separate
-> `hermes-tavern-cards` skill for management. It's been merged into
-> `hermes-tavern` so users only install one skill and Hermes only has
-> one trigger surface to route. If your `hermes skills list` still
-> shows `hermes-tavern-cards`, run `hermes skills uninstall
-> hermes-tavern-cards`.
+> `hermes-tavern-cards` skill for management. It was merged into the
+> main skill in v0.5.0 (now `soultavern`). If your `hermes skills
+> list` still shows `hermes-tavern-cards`, run `hermes skills
+> uninstall hermes-tavern-cards`.
 
 The `skills/` subdirectory matches the `path: "skills/"` convention
 used by `openai/skills` and `anthropics/skills`, so
-`hermes skills tap add imphillip/hermes-tavern` works without any
+`hermes skills tap add imphillip/SoulTavern` works without any
 extra configuration. Each skill folder uses the standard
 `references/` / `scripts/` / `assets/` layout — only
 categories with content are populated.
@@ -410,12 +430,12 @@ categories with content are populated.
   HERMES.md index. The character will still load, but with whatever
   the agent was willing to keep. If you want a fuller pass, re-run
   the agent step against `source.md` with a different model and then
-  re-run `hermes-tavern finalize`.
+  re-run `soultavern finalize`.
 
 ## Development
 
 ```bash
-git clone https://github.com/imphillip/hermes-tavern.git && cd hermes-tavern
+git clone https://github.com/imphillip/SoulTavern.git && cd SoulTavern
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 
@@ -440,7 +460,7 @@ PRs welcome. Before opening one:
 1. Add or update tests under `tests/` for whatever you change.
 2. Run `pytest` and confirm it stays green.
 3. If you change the card → markdown contract, update
-   `skills/hermes-tavern/references/field-mapping.md` so the spec
+   `skills/soultavern/references/field-mapping.md` so the spec
    matches the code.
 4. If you add a new CLI flag, mention it in the relevant `SKILL.md`
    and the README's "Common workflows" block.

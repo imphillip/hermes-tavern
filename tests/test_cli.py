@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from hermes_tavern.cli import main
+from soultavern.cli import main
 
 
 def run(*args: str) -> int:
@@ -14,7 +14,7 @@ def test_version(capsys):
         run("--version")
     assert exc.value.code == 0
     out = capsys.readouterr().out
-    assert "hermes-tavern" in out
+    assert "soultavern" in out
 
 
 def test_no_command_shows_help(capsys):

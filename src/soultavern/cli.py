@@ -1,4 +1,4 @@
-"""``hermes-tavern`` command-line interface."""
+"""``soultavern`` command-line interface."""
 
 from __future__ import annotations
 
@@ -34,11 +34,11 @@ def _resolve_target(name: str) -> Target:
     if target is None:
         valid = ", ".join(sorted(TARGETS.keys()))
         raise SystemExit(
-            f"hermes-tavern: unknown --target {name!r}. Valid: {valid}"
+            f"soultavern: unknown --target {name!r}. Valid: {valid}"
         )
     if not target.implemented:
         raise SystemExit(
-            f"hermes-tavern: --target {name!r} is registered but not yet "
+            f"soultavern: --target {name!r} is registered but not yet "
             f"implemented in this release. v0.6.x supports --target hermes "
             f"only; openclaw and generic land in v0.7+."
         )
@@ -55,20 +55,20 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         return handler(args)
     except CardError as exc:
-        print(f"hermes-tavern: card error: {exc}", file=sys.stderr)
+        print(f"soultavern: card error: {exc}", file=sys.stderr)
         return _EXIT_USAGE
     except NeedsAgentCategorizationError as exc:
         _print_agent_handoff(exc)
         return _EXIT_NEEDS_AGENT
     except library.LibraryError as exc:
-        print(f"hermes-tavern: {exc}", file=sys.stderr)
+        print(f"soultavern: {exc}", file=sys.stderr)
         return _EXIT_USAGE
     except SnapshotError as exc:
-        print(f"hermes-tavern: {exc}", file=sys.stderr)
+        print(f"soultavern: {exc}", file=sys.stderr)
         return _EXIT_USAGE
     except BudgetExceededError as exc:
         print(
-            f"hermes-tavern: {exc.kind} is too large ({exc.size}/{exc.limit} chars). "
+            f"soultavern: {exc.kind} is too large ({exc.size}/{exc.limit} chars). "
             "Trim description / personality / mes_example or split the lorebook.",
             file=sys.stderr,
         )
@@ -77,10 +77,10 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="hermes-tavern",
+        prog="soultavern",
         description="Import and manage SillyTavern V2 character cards for Hermes-Agent.",
     )
-    parser.add_argument("--version", action="version", version=f"hermes-tavern {__version__}")
+    parser.add_argument("--version", action="version", version=f"soultavern {__version__}")
     sub = parser.add_subparsers(dest="command", metavar="COMMAND")
 
     p_import = sub.add_parser("import", help="Import a card and make it the active persona.")
@@ -310,17 +310,25 @@ def _cmd_current(args: argparse.Namespace) -> int:
     if record is None:
         print("(no active character)")
         return _EXIT_OK
+    target = TARGETS.get(record.target, DEFAULT_TARGET)
     print(f"name:                {record.name}")
     print(f"card file:           {record.card_file}")
+    print(f"target:              {record.target}")
     print(f"imported at:         {record.imported_at}")
     print(f"user noun:           {record.user_noun}")
     print(f"trust system prompt: {record.trust_system_prompt}")
     print(f"finalized:           {record.finalized}")
-    print(f"SOUL.md:             {library.soul_path(args.home)}"
-          f" {'(missing!)' if not library.soul_path(args.home).exists() else ''}")
+    soul_p = library.soul_path(args.home, target)
+    print(f"{target.soul_filename + ':':<20} {soul_p}"
+          f" {'(missing!)' if not soul_p.exists() else ''}")
     if record.has_hermes_md:
-        print(f"HERMES.md:           {library.hermes_path(args.home)}"
-              f" {'(missing!)' if not library.hermes_path(args.home).exists() else ''}")
+        comp_p = library.hermes_path(args.home, target)
+        print(f"{target.companion_filename + ':':<20} {comp_p}"
+              f" {'(missing!)' if not comp_p.exists() else ''}")
+    for extra in target.extra_files:
+        extra_p = args.home / extra.filename
+        print(f"{extra.filename + ':':<20} {extra_p}"
+              f" {'(missing!)' if not extra_p.exists() else ''}")
     if record.extended_dir:
         ext = args.home / record.extended_dir
         marker = "" if ext.exists() else " (missing!)"
@@ -359,14 +367,14 @@ def _cmd_delete(args: argparse.Namespace) -> int:
 def _cmd_restore(args: argparse.Namespace) -> int:
     dest = library.restore_card(args.home, args.card)
     print(f"restored to {dest}")
-    print("run `hermes-tavern switch --card <name> --home <home>` to activate it")
+    print("run `soultavern switch --card <name> --home <home>` to activate it")
     return _EXIT_OK
 
 
 def _cmd_history(args: argparse.Namespace) -> int:
     snaps = library.list_history(args.home)
     if not snaps:
-        print("(no snapshots — run `hermes-tavern import` first)")
+        print("(no snapshots — run `soultavern import` first)")
         return _EXIT_OK
     print(f"{'id':<6} {'when':<20} {'action':<10} {'name':<30} files")
     for s in snaps:
@@ -395,7 +403,7 @@ def _cmd_revert(args: argparse.Namespace) -> int:
 def _print_agent_handoff(exc: NeedsAgentCategorizationError) -> None:
     """Render the structured handoff message the agent looks for."""
     print(
-        f"hermes-tavern: {exc.char_name} is oversized "
+        f"soultavern: {exc.char_name} is oversized "
         f"({exc.rendered_size} chars over the {exc.threshold}-char threshold).",
         file=sys.stderr,
     )
@@ -412,12 +420,12 @@ def _print_agent_handoff(exc: NeedsAgentCategorizationError) -> None:
     )
     print("", file=sys.stderr)
     print(
-        "Then run `hermes-tavern finalize --card <name> --home <home>` to "
+        "Then run `soultavern finalize --card <name> --home <home>` to "
         "assemble SOUL.md and HERMES.md.",
         file=sys.stderr,
     )
     print(
-        "See `hermes-tavern/SKILL.md` → \"Oversized card procedure\" for the full protocol.",
+        "See `soultavern/SKILL.md` → \"Oversized card procedure\" for the full protocol.",
         file=sys.stderr,
     )
 
@@ -425,19 +433,38 @@ def _print_agent_handoff(exc: NeedsAgentCategorizationError) -> None:
 def _report_outcome(home: Path, outcome: library.ApplyOutcome, library_path: Path,
                     *, soul_only: bool) -> None:
     """Print a one-screen summary of what was written."""
-    print(f"wrote {library.soul_path(home)}")
+    # Pull the active record's target for accurate filename labels —
+    # the outcome doesn't carry the target object directly.
+    record = library.read_active(home)
+    target = TARGETS.get(record.target, DEFAULT_TARGET) if record else DEFAULT_TARGET
+
+    soul_p = library.soul_path(home, target)
+    comp_p = library.hermes_path(home, target)
+    print(f"wrote {soul_p}")
     if outcome.finalized:
         print(f"  (curated SOUL from picks: {outcome.curated_soul_size} chars)")
-        print(f"wrote {library.hermes_path(home)} "
+        print(f"wrote {comp_p} "
               f"(index over {outcome.extended_files} extended file(s))")
         print(f"extended files at {home / 'cards' / library_path.stem / 'extended'}")
+        for extra in target.extra_files:
+            print(f"wrote {home / extra.filename}")
     else:
         if outcome.wrote_hermes_md:
-            print(f"wrote {library.hermes_path(home)}")
+            if target.companion_write_mode == "managed-section":
+                print(f"updated {comp_p} (soultavern managed section)")
+                if outcome.extended_files:
+                    print(f"  ({outcome.extended_files} extended file(s) indexed)")
+            else:
+                print(f"wrote {comp_p}")
         elif soul_only:
-            print("HERMES.md skipped (--soul-only)")
+            print(f"{target.companion_filename} skipped (--soul-only)")
         else:
-            print("no character_book in this card; HERMES.md not written")
+            print(f"no character_book in this card; {target.companion_filename} not written")
+        # Extra files (IDENTITY.md for OpenClaw, etc.) — only on
+        # non-finalize, non-soul-only paths
+        if not soul_only:
+            for extra in target.extra_files:
+                print(f"wrote {home / extra.filename}")
     print(f"backed up card to {library_path}")
     if outcome.rendered.truncated_entries:
         print(
@@ -446,8 +473,9 @@ def _report_outcome(home: Path, outcome: library.ApplyOutcome, library_path: Pat
             file=sys.stderr,
         )
     print(f"\nto activate: cd {home} && hermes", file=sys.stderr)
-    print("(HERMES.md is read from cwd, not HERMES_HOME — must launch from "
-          "inside the home directory)", file=sys.stderr)
+    if target.companion_filename == "HERMES.md":
+        print("(HERMES.md is read from cwd, not HERMES_HOME — must launch from "
+              "inside the home directory)", file=sys.stderr)
     print("(if hermes is already running in a channel, use /new for a fresh "
           "session — or /reset to clear and reload — to apply this card)",
           file=sys.stderr)
@@ -457,13 +485,13 @@ def _emit_findings(findings: list[Finding], *, trust_system_prompt: bool) -> Non
     """Print scan warnings to stderr. Never blocks; only informs."""
     if not findings:
         return
-    print(f"hermes-tavern: scan found {len(findings)} suspicious pattern(s):",
+    print(f"soultavern: scan found {len(findings)} suspicious pattern(s):",
           file=sys.stderr)
     for finding in findings:
         print(f"  WARN {finding.format()}", file=sys.stderr)
     if trust_system_prompt:
         print(
-            "hermes-tavern: --trust-system-prompt is on; the card's system_prompt and "
+            "soultavern: --trust-system-prompt is on; the card's system_prompt and "
             "post_history_instructions are rendered with operator-level trust. Review the "
             "above warnings carefully before activating.",
             file=sys.stderr,
