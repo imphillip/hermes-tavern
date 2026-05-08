@@ -480,7 +480,7 @@ PR 歓迎です。提出前に:
 ## 使用例
 
 [agentbox.id](https://agentbox.id) の `soul-loader`(agentbox の魂読み込みフロー)は、
-Hermes ランタイム上で HermesTavern を内部的にインストール・呼び出します。
+Hermes と OpenClaw ランタイム上で SoulTavern を内部的にインストール・呼び出します。
 詳細は [`agentbox.id/setup/soul-loader.md`](https://agentbox.id/setup/soul-loader.md)
 を参照。
 

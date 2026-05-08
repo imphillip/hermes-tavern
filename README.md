@@ -474,8 +474,8 @@ also welcome.
 ## Used by
 
 [agentbox.id](https://agentbox.id) — `soul-loader`, the agentbox-blessed
-soul-loading flow, installs HermesTavern under the hood. See
-[`agentbox.id/setup/soul-loader.md`](https://agentbox.id/setup/soul-loader.md).
+soul-loading flow for Hermes and OpenClaw, installs SoulTavern under the
+hood. See [`agentbox.id/setup/soul-loader.md`](https://agentbox.id/setup/soul-loader.md).
 
 ## License
 

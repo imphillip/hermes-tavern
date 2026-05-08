@@ -429,7 +429,7 @@ staging、extended、finalize、library、CLI、以及端到端 pipeline。
 ## 被使用情况
 
 [agentbox.id](https://agentbox.id) 的 `soul-loader` —— agentbox 的灵魂加载入口 ——
-在 Hermes 运行时下安装并调用 HermesTavern。
+在 Hermes 与 OpenClaw 运行时下安装并调用 SoulTavern。
 详见 [`agentbox.id/setup/soul-loader.md`](https://agentbox.id/setup/soul-loader.md)。
 
 ## 协议
