@@ -78,7 +78,7 @@ runtimes is registered as a skeleton and lands in a later release.
 ## Using it
 
 Hermes is a competent AI agent — it understands intent, downloads
-attachments, runs the right tool. Once HermesTavern is installed,
+attachments, runs the right tool. Once SoulTavern is installed,
 the entire UX is conversational. No commands to memorize.
 
 In your Hermes chat (Telegram, Discord, QQ, email — any channel
@@ -91,7 +91,7 @@ Hermes already speaks on), upload the card file and say what you want:
 > forget all characters, go back to default Hermes
 
 That's the whole surface area. Hermes parses what you mean, calls
-`hermes-tavern` under the hood, and tells you to run `/new` or
+`soultavern` under the hood, and tells you to run `/new` or
 `/reset` when the change is ready to load. Anything ambiguous, just
 clarify in plain language — Hermes handles the rest.
 
@@ -158,7 +158,7 @@ hub command only handles the first:
 
 ```bash
 bash skills/soultavern/scripts/uninstall.sh   # removes the CLI; --dry-run to preview
-hermes skills uninstall hermes-tavern            # removes the skill
+hermes skills uninstall soultavern               # removes the skill
 ```
 
 The uninstaller auto-detects pipx / uv tool / dedicated venv, refuses
@@ -183,7 +183,7 @@ Hermes already auto-loads `SOUL.md` (independent identity slot) and
 on every session start. The only thing missing is a converter that
 respects the SillyTavern V2 schema, the placeholder grammar
 (`{{char}}`, `{{user}}`, `<BOT>`, `<USER>`), and the lorebook layout.
-That's HermesTavern.
+That's SoulTavern's `--target hermes`.
 
 What we deliberately don't do:
 
@@ -217,7 +217,7 @@ What we deliberately don't do:
   the cards imported into a `HERMES_HOME`
 - **Snapshot history** — every `import` / `switch` / `revert` is
   captured under `cards/.snapshots/`, with a special `pristine`
-  snapshot of the pre-HermesTavern state. `revert --to pristine` /
+  snapshot of the pre-import state. `revert --to pristine` /
   `--previous` / `--to <id|name>` walks the history
 - **Channel-agnostic** — produces the persona files Hermes loads at
   startup; everything Hermes can talk on is automatically in character
@@ -261,9 +261,10 @@ or filename stem).
 
 ## Operating modes
 
-HermesTavern picks one of two modes per card based on the rendered
+SoulTavern picks one of two modes per card based on the rendered
 size. The threshold is 75% of the Hermes 20k slot — i.e. 15,000 chars
-— for **either** SOUL.md or HERMES.md.
+— for **either** SOUL.md or HERMES.md (`--target hermes`; OpenClaw
+budgets differ — see `references/openclaw-target.md`).
 
 ### Small cards (rendered output ≤ 15k per slot)
 
@@ -281,7 +282,7 @@ size. The threshold is 75% of the Hermes 20k slot — i.e. 15,000 chars
 
 ### Oversized cards (rendered SOUL or HERMES > 15k) — agent-driven
 
-HermesTavern does **not** shell out to a separate LLM. Instead `import`
+SoulTavern does **not** shell out to a separate LLM. Instead `import`
 stages the source material on disk, exits with code 2, and asks the
 calling agent to redistribute that material into eight V2-aligned
 categories — faithful to original wording, declining gracefully when
@@ -323,14 +324,16 @@ here (HERMES.md is the index that points at the per-category files).
 Full procedure, including failure modes and the `finalize` step, lives
 in [`skills/soultavern/references/oversized-cards.md`](skills/soultavern/references/oversized-cards.md).
 
-## Files HermesTavern writes — and never writes
+## Files SoulTavern writes — and never writes
 
 **Writes (only inside `<HERMES_HOME>`):** the layout above. That's the
 entire blast radius.
 
-**Never writes:**
+**Never writes (`--target hermes`):**
 
 - `AGENTS.md` — shadowed by HERMES.md per Hermes's loader priority.
+  (`--target openclaw` writes a managed section into `AGENTS.md`,
+  preserving any existing user content outside the markers.)
 - `MEMORY.md`, `USER.md` — owned by the running agent's memory tool.
 - `CLAUDE.md`, `.cursorrules` — other tools' territory.
 - Any file outside `<HERMES_HOME>` at runtime.
@@ -405,7 +408,7 @@ categories with content are populated.
 - **No multi-character chat in one Hermes instance.** Run a separate
   `HERMES_HOME` per character.
 - **No channel-level safety controls.** Configure these on the Hermes
-  side (`platform_toolsets`, allowlists, rate limits). HermesTavern
+  side (`platform_toolsets`, allowlists, rate limits). SoulTavern
   only writes the persona files.
 - **No live edits.** Hermes caches the system prompt at session start.
   Edits to `SOUL.md` / `HERMES.md` take effect on the next session or
@@ -417,14 +420,14 @@ categories with content are populated.
   the embedded card data.** SillyTavern V2 cards keep the actual
   payload inside a PNG `tEXt` chunk; when an IM rewrites the image
   (resizing, stripping metadata, converting to a JPEG thumbnail, …),
-  the chunk is gone and HermesTavern can't parse the file.
+  the chunk is gone and SoulTavern can't parse the file.
   **Workaround:** zip the PNG before uploading
   (`zip aldous.zip aldous.png`) so the IM treats it as an opaque
   binary blob and leaves the bytes untouched. Hermes can unzip and
   import from there.
 - **Oversized cards on policy-restricted agents may end up with
   partial categorization.** When a card overflows the 15k threshold
-  HermesTavern stages source material and asks the calling agent to
+  SoulTavern stages source material and asks the calling agent to
   categorize it. A policy-restricted agent may decline some categories
   (e.g. `kinks.md`) — those will be absent from the assembled
   HERMES.md index. The character will still load, but with whatever
@@ -476,4 +479,4 @@ soul-loading flow, installs HermesTavern under the hood. See
 
 ## License
 
-[MIT](LICENSE) — © 2026 HermesTavern contributors.
+[MIT](LICENSE) — © 2026 SoulTavern contributors.
