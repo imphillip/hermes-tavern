@@ -1,7 +1,7 @@
 ---
 name: soultavern
 description: "Import and manage SillyTavern V2 character cards (.png/.json) for any agent runtime with a SOUL.md-style persona file. Pure-stdlib skill folder — no install. v2.0 supports --target hermes (Hermes-Agent) and --target openclaw (OpenClaw workspaces). Channel-agnostic — affects every gateway."
-version: 2.0.0
+version: 2.0.2
 author: SoulTavern contributors
 license: MIT
 metadata:

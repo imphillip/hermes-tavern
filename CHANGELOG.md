@@ -1,5 +1,24 @@
 # Changelog
 
+## 2.0.2 — Version-stamp consistency
+
+v2.0.1 shipped with the version field in
+`skills/soultavern/SKILL.md`'s frontmatter still reading `2.0.0` —
+the bump landed in `pyproject.toml` and `__init__.py` but missed the
+skill's own metadata header. Agents that read SKILL.md to surface
+"which version is installed" therefore reported the wrong number.
+
+This release:
+
+- Bumps SKILL.md frontmatter to match pyproject + `__version__`.
+- Hardens `.github/workflows/release.yml` to verify pyproject,
+  SKILL.md frontmatter, **and** the git tag all agree before
+  shipping a release. The original check covered only pyproject vs
+  tag, which is what let v2.0.1 slip through.
+
+No agent-instruction or human-doc body changes; just the stamp fix
+and the workflow guard.
+
 ## 2.0.1 — Two layers polished, separated
 
 Five commits since v2.0.0 across two distinct surfaces. They affect

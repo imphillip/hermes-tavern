@@ -13,14 +13,16 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Verify pyproject version matches tag
+      - name: Verify version stamps agree across pyproject, SKILL.md, and tag
         run: |
           PYPROJECT_VERSION=$(grep -E '^version\s*=\s*"' pyproject.toml | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+          SKILL_VERSION=$(grep -E '^version:\s*' skills/soultavern/SKILL.md | head -1 | sed -E 's/^version:\s*//' | tr -d '"')
           TAG_VERSION="${GITHUB_REF#refs/tags/v}"
           echo "pyproject: $PYPROJECT_VERSION"
+          echo "SKILL.md:  $SKILL_VERSION"
           echo "tag:       $TAG_VERSION"
-          if [ "$PYPROJECT_VERSION" != "$TAG_VERSION" ]; then
-            echo "::error::version mismatch — pyproject and tag must agree"
+          if [ "$PYPROJECT_VERSION" != "$TAG_VERSION" ] || [ "$SKILL_VERSION" != "$TAG_VERSION" ]; then
+            echo "::error::version mismatch — pyproject.toml, SKILL.md frontmatter, and the git tag must all agree"
             exit 1
           fi
 
