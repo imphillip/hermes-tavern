@@ -3,6 +3,9 @@
 [English](README.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
 > SOUL.md を読み込むあらゆる agent runtime で SillyTavern キャラクターを動かす。
+>
+> _ワークエージェントに面白い魂を——仕事も遊びも、二者択一じゃない。
+> プログラマーのロマン。_
 
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
@@ -246,6 +249,11 @@ PR 歓迎。テストを追加し、グリーンに保ち、カード → markdo
 裏側のエンジンとして呼び出します。詳細は
 [`agentbox.id/setup/soul-loader.md`](https://agentbox.id/setup/soul-loader.md)
 を参照。
+
+## スポンサー
+
+**[Miko Tavern](https://tavern.host)** —— 同じ作者の Telegram bot プロジェクト。
+同じ流派のロマン、別の舞台。
 
 ## ライセンス
 

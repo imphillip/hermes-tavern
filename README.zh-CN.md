@@ -3,6 +3,9 @@
 [English](README.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
 > 让任何带有 SOUL.md 的 agent runtime 都能换上你的 SillyTavern 角色卡。
+>
+> _给你的 work agent 装一个有趣的灵魂——工作娱乐两不误。
+> 程序员的浪漫。_
 
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
@@ -220,6 +223,11 @@ v2.0 不再作为可安装包发布——`pyproject.toml` 只是
 [agentbox.id](https://agentbox.id) 的 `soul-loader`——Hermes 和 OpenClaw
 runtime 下 agentbox 官方的灵魂加载入口——把 SoulTavern 作为底层引擎调用。
 详见 [`agentbox.id/setup/soul-loader.md`](https://agentbox.id/setup/soul-loader.md)。
+
+## 赞助
+
+**[Miko Tavern](https://tavern.host)** —— 本作者的另一个 Telegram bot 项目。
+同样的浪漫，不同的舞台。
 
 ## 协议
 

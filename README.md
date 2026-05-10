@@ -3,6 +3,9 @@
 [English](README.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
 > Run SillyTavern V2 character cards in any agent runtime that loads a SOUL.md.
+>
+> _Give your work agent an interesting soul — work and play, not work or play.
+> A programmer's romance._
 
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
@@ -232,6 +235,11 @@ if you change the card → markdown contract.
 soul-loading flow for Hermes and OpenClaw, delegates to SoulTavern as its
 underlying engine. See
 [`agentbox.id/setup/soul-loader.md`](https://agentbox.id/setup/soul-loader.md).
+
+## Sponsored by
+
+**[Miko Tavern](https://tavern.host)** — a Telegram bot project, from the same
+author. Same school of romance, different stage.
 
 ## License
 
