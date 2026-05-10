@@ -252,8 +252,7 @@ PR 歓迎。テストを追加し、グリーンに保ち、カード → markdo
 
 ## スポンサー
 
-**[Miko Tavern](https://tavern.host)** —— 同じ作者の Telegram bot プロジェクト。
-同じ流派のロマン、別の舞台。
+**[Miko Tavern](https://tavern.host)** —— キャラクターロールプレイ向けの Telegram bot。
 
 ## ライセンス
 

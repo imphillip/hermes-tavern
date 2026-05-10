@@ -238,8 +238,7 @@ underlying engine. See
 
 ## Sponsored by
 
-**[Miko Tavern](https://tavern.host)** — a Telegram bot project, from the same
-author. Same school of romance, different stage.
+**[Miko Tavern](https://tavern.host)** — a Telegram bot for character roleplay.
 
 ## License
 
