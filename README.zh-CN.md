@@ -160,6 +160,9 @@ skill 单方面决定的。同一份 `SOUL.md` 在不同模型上明显有差距
 比 `gpt-5.4` 演得明显好得多。如果一张卡读起来平淡，先换个模型试试，
 再去怀疑卡或 SoulTavern 的渲染。
 
+想找地方跑 roleplay 友好的模型？[gptproto.com](https://gptproto.com/?r=GGUHQXGN)
+是一个选择——这个链接带推荐码，下单会有折扣。_（推广链接，顺便支持一下项目）_
+
 ## 已知限制
 
 - **不做关键词触发的 lorebook 注入。** 所有启用的 entry 按 always-on 渲染。

@@ -166,6 +166,10 @@ directive. From hands-on testing: a model like `grok-4.20` carries character
 substantially better than `gpt-5.4` for the same card. If a card feels flat,
 try a different model before blaming the card or SoulTavern's rendering.
 
+Need somewhere to run roleplay-friendly models?
+[gptproto.com](https://gptproto.com/?r=GGUHQXGN) is one option — that link
+applies a referral discount. _(Affiliate link; helps support the project.)_
+
 ## Limitations
 
 - **No keyword-triggered lorebook injection.** All enabled entries render as
