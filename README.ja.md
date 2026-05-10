@@ -58,14 +58,14 @@ agent は `SKILL.md` を読み、`skills/soultavern/scripts/` 配下の対応す
 設定して:
 
 ```bash
-python3 $SKILL/scripts/import.py   --card aldous.png --home ~/.hermes-roleplay
+python3 $SKILL/scripts/import.py   --card aldous.png --home $HERMES_HOME
 python3 $SKILL/scripts/import.py   --card aldous.png --home ~/.openclaw/workspace --target openclaw
 python3 $SKILL/scripts/validate.py --card aldous.png
 
 # ライブラリ: list / current / switch / delete / restore / history / revert / finalize
-python3 $SKILL/scripts/list.py   --home ~/.hermes-roleplay
-python3 $SKILL/scripts/switch.py --card alice --home ~/.hermes-roleplay
-python3 $SKILL/scripts/revert.py --home ~/.hermes-roleplay --to pristine
+python3 $SKILL/scripts/list.py   --home $HERMES_HOME
+python3 $SKILL/scripts/switch.py --card alice --home $HERMES_HOME
+python3 $SKILL/scripts/revert.py --home $HERMES_HOME --to pristine
 ```
 
 各スクリプトは `--help` に対応。フラグ・終了コード・出力挙動は

@@ -144,7 +144,7 @@ import / switch / delete / revert.
 `SOUL.md` is read from `<home>` regardless of cwd. `HERMES.md`
 (hermes target) is read relative to **cwd at hermes startup** —
 if you run `hermes` from your home directory while `HERMES_HOME`
-points at `~/.hermes-roleplay`, the SOUL.md will load but the
+points at `$HERMES_HOME`, the SOUL.md will load but the
 HERMES.md (and therefore the persona's extended-file index) will not.
 
 The required posture for `--target hermes` is:

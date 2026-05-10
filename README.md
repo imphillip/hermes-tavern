@@ -56,14 +56,14 @@ The agent reads `SKILL.md`, calls the right script under
 For direct script invocation, set `SKILL=path/to/skills/soultavern` and:
 
 ```bash
-python3 $SKILL/scripts/import.py   --card aldous.png --home ~/.hermes-roleplay
+python3 $SKILL/scripts/import.py   --card aldous.png --home $HERMES_HOME
 python3 $SKILL/scripts/import.py   --card aldous.png --home ~/.openclaw/workspace --target openclaw
 python3 $SKILL/scripts/validate.py --card aldous.png
 
 # Library: list / current / switch / delete / restore / history / revert / finalize
-python3 $SKILL/scripts/list.py   --home ~/.hermes-roleplay
-python3 $SKILL/scripts/switch.py --card alice --home ~/.hermes-roleplay
-python3 $SKILL/scripts/revert.py --home ~/.hermes-roleplay --to pristine
+python3 $SKILL/scripts/list.py   --home $HERMES_HOME
+python3 $SKILL/scripts/switch.py --card alice --home $HERMES_HOME
+python3 $SKILL/scripts/revert.py --home $HERMES_HOME --to pristine
 ```
 
 Every script takes `--help`. Flag names, exit codes, and output behavior are

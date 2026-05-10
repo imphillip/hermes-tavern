@@ -7,23 +7,23 @@ on the runtime side; SoulTavern only writes the persona files.
 
 All examples use the hermes target. Set `SKILL=path/to/skills/soultavern`
 first; for the openclaw target swap `--target openclaw` and use your
-OpenClaw workspace dir instead of `~/.hermes-roleplay`.
+OpenClaw workspace dir instead of `$HERMES_HOME`.
 
 ## 1. First-time import
 
 ```bash
-python3 $SKILL/scripts/import.py --card aldous.png --home ~/.hermes-roleplay
-HERMES_HOME=~/.hermes-roleplay hermes
+python3 $SKILL/scripts/import.py --card aldous.png --home $HERMES_HOME
+cd $HERMES_HOME && hermes
 ```
 
-The import copies `aldous.png` into `~/.hermes-roleplay/cards/` for
+The import copies `aldous.png` into `$HERMES_HOME/cards/` for
 safekeeping, renders `SOUL.md` (and `HERMES.md` if the card has a
-lorebook) into `~/.hermes-roleplay/`, and records the new card as active.
+lorebook) into `$HERMES_HOME/`, and records the new card as active.
 
 ## 2. Preview before committing
 
 ```bash
-python3 $SKILL/scripts/import.py --card aldous.png --home ~/.hermes-roleplay --dry-run
+python3 $SKILL/scripts/import.py --card aldous.png --home $HERMES_HOME --dry-run
 ```
 
 Renders to stdout in fenced markdown blocks. No files are touched, no
@@ -35,10 +35,10 @@ The import script refuses to overwrite by default. Two ways to switch:
 
 ```bash
 # (a) Re-import the same or a new card
-python3 $SKILL/scripts/import.py --card alice.png --home ~/.hermes-roleplay --overwrite
+python3 $SKILL/scripts/import.py --card alice.png --home $HERMES_HOME --overwrite
 
 # (b) Switch to a card already in the library
-python3 $SKILL/scripts/switch.py --card alice --home ~/.hermes-roleplay
+python3 $SKILL/scripts/switch.py --card alice --home $HERMES_HOME
 ```
 
 Prefer (b) when the card is already imported — it does not duplicate the
@@ -49,16 +49,16 @@ backup and reuses the previous `--user-noun` setting.
 Import each card once:
 
 ```bash
-python3 $SKILL/scripts/import.py --card alice.png --home ~/.hermes-roleplay
-python3 $SKILL/scripts/import.py --card bob.json  --home ~/.hermes-roleplay --overwrite
-python3 $SKILL/scripts/import.py --card carol.png --home ~/.hermes-roleplay --overwrite
+python3 $SKILL/scripts/import.py --card alice.png --home $HERMES_HOME
+python3 $SKILL/scripts/import.py --card bob.json  --home $HERMES_HOME --overwrite
+python3 $SKILL/scripts/import.py --card carol.png --home $HERMES_HOME --overwrite
 ```
 
 Then switch on demand:
 
 ```bash
-python3 $SKILL/scripts/list.py   --home ~/.hermes-roleplay
-python3 $SKILL/scripts/switch.py --card alice --home ~/.hermes-roleplay
+python3 $SKILL/scripts/list.py   --home $HERMES_HOME
+python3 $SKILL/scripts/switch.py --card alice --home $HERMES_HOME
 ```
 
 For *concurrent* multi-character setups (e.g. one runtime instance for
@@ -69,7 +69,7 @@ directories** rather than trying to multiplex one instance.
 
 ```bash
 python3 $SKILL/scripts/import.py --card alice.png \
-        --home ~/.hermes-roleplay \
+        --home $HERMES_HOME \
         --user-noun "the operator"
 ```
 
@@ -81,7 +81,7 @@ unless overridden.
 ## 6. Skip the lorebook
 
 ```bash
-python3 $SKILL/scripts/import.py --card alice.png --home ~/.hermes-roleplay --soul-only
+python3 $SKILL/scripts/import.py --card alice.png --home $HERMES_HOME --soul-only
 ```
 
 Useful when (a) the lorebook would push you over the runtime's per-file
@@ -93,20 +93,20 @@ If a previous run wrote a companion file (`HERMES.md` for hermes target,
 
 ```bash
 # Send a card to the trash
-python3 $SKILL/scripts/delete.py --card bob --home ~/.hermes-roleplay
+python3 $SKILL/scripts/delete.py --card bob --home $HERMES_HOME
 
 # Inspect what's in the trash
-python3 $SKILL/scripts/list.py --home ~/.hermes-roleplay --all
+python3 $SKILL/scripts/list.py --home $HERMES_HOME --all
 
 # Pull it back out
-python3 $SKILL/scripts/restore.py --card bob --home ~/.hermes-roleplay
+python3 $SKILL/scripts/restore.py --card bob --home $HERMES_HOME
 ```
 
 Notes:
 
 - `delete` is always soft — files move to `cards/.trash/`, never
   unlinked. Empty the trash from the host shell when you are sure
-  (`rm ~/.hermes-roleplay/cards/.trash/*`).
+  (`rm $HERMES_HOME/cards/.trash/*`).
 - If you delete the *active* card, the persona files (`SOUL.md` plus
   the target's companion files) stay in place — the active record is
   just cleared. Switch to another card if you want the persona gone too.

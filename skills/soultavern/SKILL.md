@@ -74,16 +74,16 @@ the absolute path to this skill folder.
 SKILL_DIR=<absolute path to this skills/soultavern folder>
 
 # Import a card
-python3 "$SKILL_DIR/scripts/import.py" --card aldous.png --home ~/.hermes-roleplay
+python3 "$SKILL_DIR/scripts/import.py" --card aldous.png --home $HERMES_HOME
 
 # Same, targeting OpenClaw
 python3 "$SKILL_DIR/scripts/import.py" \
     --card aldous.png --home ~/.openclaw/workspace --target openclaw
 
 # Library management — see "Library management" section
-python3 "$SKILL_DIR/scripts/list.py"    --home ~/.hermes-roleplay
-python3 "$SKILL_DIR/scripts/current.py" --home ~/.hermes-roleplay
-python3 "$SKILL_DIR/scripts/switch.py"  --card alice --home ~/.hermes-roleplay
+python3 "$SKILL_DIR/scripts/list.py"    --home $HERMES_HOME
+python3 "$SKILL_DIR/scripts/current.py" --home $HERMES_HOME
+python3 "$SKILL_DIR/scripts/switch.py"  --card alice --home $HERMES_HOME
 ```
 
 Run any script with `--help` to see its full flag list. The flag
@@ -92,8 +92,8 @@ surface is identical across targets — `--target` selects the runtime.
 ## Quick start (Hermes target — default)
 
 ```bash
-python3 "$SKILL_DIR/scripts/import.py" --card aldous.png --home ~/.hermes-roleplay
-cd ~/.hermes-roleplay && HERMES_HOME=~/.hermes-roleplay hermes
+python3 "$SKILL_DIR/scripts/import.py" --card aldous.png --home $HERMES_HOME
+cd $HERMES_HOME && hermes
 ```
 
 **Hermes launch posture.** `SOUL.md` is read from `HERMES_HOME`, but
@@ -153,26 +153,26 @@ directory; switching writes a fresh SOUL.md + companion file from a
 card already in the library.
 
 ```bash
-python3 "$SKILL_DIR/scripts/current.py" --home ~/.hermes-roleplay
-python3 "$SKILL_DIR/scripts/list.py"    --home ~/.hermes-roleplay
-python3 "$SKILL_DIR/scripts/list.py"    --home ~/.hermes-roleplay --all     # include trash
+python3 "$SKILL_DIR/scripts/current.py" --home $HERMES_HOME
+python3 "$SKILL_DIR/scripts/list.py"    --home $HERMES_HOME
+python3 "$SKILL_DIR/scripts/list.py"    --home $HERMES_HOME --all     # include trash
 
 # Switch active persona
-python3 "$SKILL_DIR/scripts/switch.py"  --card alice --home ~/.hermes-roleplay
+python3 "$SKILL_DIR/scripts/switch.py"  --card alice --home $HERMES_HOME
 
 # Soft-delete a card (moves to cards/.trash/)
-python3 "$SKILL_DIR/scripts/delete.py"  --card bob --home ~/.hermes-roleplay
+python3 "$SKILL_DIR/scripts/delete.py"  --card bob --home $HERMES_HOME
 
 # Bring it back
-python3 "$SKILL_DIR/scripts/restore.py" --card bob --home ~/.hermes-roleplay
+python3 "$SKILL_DIR/scripts/restore.py" --card bob --home $HERMES_HOME
 
 # Snapshot history (every import/switch is captured)
-python3 "$SKILL_DIR/scripts/history.py" --home ~/.hermes-roleplay
+python3 "$SKILL_DIR/scripts/history.py" --home $HERMES_HOME
 
 # Revert to a snapshot
-python3 "$SKILL_DIR/scripts/revert.py"  --home ~/.hermes-roleplay --to pristine
-python3 "$SKILL_DIR/scripts/revert.py"  --home ~/.hermes-roleplay --to alice
-python3 "$SKILL_DIR/scripts/revert.py"  --home ~/.hermes-roleplay --previous
+python3 "$SKILL_DIR/scripts/revert.py"  --home $HERMES_HOME --to pristine
+python3 "$SKILL_DIR/scripts/revert.py"  --home $HERMES_HOME --to alice
+python3 "$SKILL_DIR/scripts/revert.py"  --home $HERMES_HOME --previous
 ```
 
 For `switch` / `delete` / `restore`, the `--card` argument is matched in
@@ -207,7 +207,7 @@ LLM. Instead it stages the source material on disk and asks the agent
 soultavern: Veranna is oversized (16842 chars over the 15000-char threshold).
 
 Source material has been staged for the agent at:
-  /Users/me/.hermes-roleplay/cards/Veranna_20260502T010101/source.md
+  $HERMES_HOME/cards/Veranna_20260502T010101/source.md
 
 Next step: read that file, redistribute its content into per-category
 files under the sibling extended/ directory ...

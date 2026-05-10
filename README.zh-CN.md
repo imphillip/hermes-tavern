@@ -55,14 +55,14 @@ agent 读 `SKILL.md`，调用 `skills/soultavern/scripts/` 下相应的脚本，
 要直接调脚本，先设 `SKILL=path/to/skills/soultavern`，然后：
 
 ```bash
-python3 $SKILL/scripts/import.py   --card aldous.png --home ~/.hermes-roleplay
+python3 $SKILL/scripts/import.py   --card aldous.png --home $HERMES_HOME
 python3 $SKILL/scripts/import.py   --card aldous.png --home ~/.openclaw/workspace --target openclaw
 python3 $SKILL/scripts/validate.py --card aldous.png
 
 # 卡库：list / current / switch / delete / restore / history / revert / finalize
-python3 $SKILL/scripts/list.py   --home ~/.hermes-roleplay
-python3 $SKILL/scripts/switch.py --card alice --home ~/.hermes-roleplay
-python3 $SKILL/scripts/revert.py --home ~/.hermes-roleplay --to pristine
+python3 $SKILL/scripts/list.py   --home $HERMES_HOME
+python3 $SKILL/scripts/switch.py --card alice --home $HERMES_HOME
+python3 $SKILL/scripts/revert.py --home $HERMES_HOME --to pristine
 ```
 
 每个脚本都接受 `--help`。flag、exit code、输出行为在两个 target 之间
