@@ -13,25 +13,14 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v6
-        with:
-          python-version: '3.12'
-
-      - name: Verify bundled wheel matches pyproject version
+      - name: Verify pyproject version matches tag
         run: |
           PYPROJECT_VERSION=$(grep -E '^version\s*=\s*"' pyproject.toml | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
-          BUNDLED_WHEEL=$(ls skills/soultavern/assets/soultavern-*.whl 2>/dev/null | head -1)
-          if [ -z "$BUNDLED_WHEEL" ]; then
-            echo "::error::No bundled wheel found in skills/soultavern/assets/"
-            exit 1
-          fi
-          BUNDLED_VERSION=$(basename "$BUNDLED_WHEEL" | sed -E 's/^soultavern-([^-]+)-.*$/\1/')
           TAG_VERSION="${GITHUB_REF#refs/tags/v}"
-          echo "pyproject:  $PYPROJECT_VERSION"
-          echo "bundled:    $BUNDLED_VERSION"
-          echo "tag:        $TAG_VERSION"
-          if [ "$PYPROJECT_VERSION" != "$BUNDLED_VERSION" ] || [ "$PYPROJECT_VERSION" != "$TAG_VERSION" ]; then
-            echo "::error::version mismatch — pyproject, bundled wheel, and tag must all agree"
+          echo "pyproject: $PYPROJECT_VERSION"
+          echo "tag:       $TAG_VERSION"
+          if [ "$PYPROJECT_VERSION" != "$TAG_VERSION" ]; then
+            echo "::error::version mismatch — pyproject and tag must agree"
             exit 1
           fi
 
@@ -40,17 +29,12 @@ jobs:
           zip -r soultavern-skills.zip skills/ -x '*.DS_Store'
           ls -lh soultavern-skills.zip
 
-      - name: Locate bundled wheel
-        id: wheel
-        run: echo "path=$(ls skills/soultavern/assets/soultavern-*.whl)" >> "$GITHUB_OUTPUT"
-
-      - name: Create release with assets
+      - name: Create release with skills zip
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="${GITHUB_REF#refs/tags/}"
           gh release create "$TAG" \
             soultavern-skills.zip \
-            "${{ steps.wheel.outputs.path }}" \
             --title "$TAG" \
             --generate-notes

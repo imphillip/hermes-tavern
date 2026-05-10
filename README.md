@@ -500,7 +500,7 @@ Each skill folder uses the standard `references/` / `scripts/` /
 ```bash
 git clone https://github.com/imphillip/SoulTavern.git && cd SoulTavern
 python -m venv .venv && source .venv/bin/activate
-pip install ".[dev]"      # only pytest / ruff / mypy — no runtime deps
+pip install pytest ruff mypy   # the only deps; runtime is stdlib-only
 
 pytest                    # run the full suite
 pytest -k staging         # run a subset
@@ -508,9 +508,9 @@ pytest tests/test_real_cards_smoke.py   # real-card smoke (auto-skipped without 
 ```
 
 `tests/conftest.py` adds `skills/soultavern/scripts/` to `sys.path`, so
-imports like `from soultavern.parse import load_card` work without any
-`pip install -e .` step. The runtime package itself has zero third-party
-dependencies — `[dev]` is only the test/lint toolchain.
+imports like `from soultavern.parse import load_card` work directly. v2.0
+doesn't ship as an installable package — `pyproject.toml` is kept only
+as a config file for `ruff` / `mypy` / `pytest`.
 
 To run the real-card smoke against your own cards, drop them into
 `examples/.local/`. That directory is gitignored — license / size /

@@ -445,7 +445,7 @@ SoulTavern/
 ```bash
 git clone https://github.com/imphillip/SoulTavern.git && cd SoulTavern
 python -m venv .venv && source .venv/bin/activate
-pip install ".[dev]"      # 仅 pytest / ruff / mypy——没有运行时依赖
+pip install pytest ruff mypy   # 唯一的依赖；运行时只用 stdlib
 
 pytest                    # 跑全套
 pytest -k staging         # 跑子集
@@ -453,8 +453,9 @@ pytest tests/test_real_cards_smoke.py   # 真实卡 smoke(没卡时自动 skip)
 ```
 
 `tests/conftest.py` 会把 `skills/soultavern/scripts/` 加进 `sys.path`，
-所以 `from soultavern.parse import load_card` 之类的 import 不需要
-`pip install -e .`。运行时包零三方依赖——`[dev]` 只是测试和 lint 工具链。
+所以 `from soultavern.parse import load_card` 之类的 import 直接能用。
+v2.0 不再作为可安装的包发布——`pyproject.toml` 仅保留为
+`ruff` / `mypy` / `pytest` 的配置载体。
 
 要拿你自己的卡跑真实 smoke，把它们丢到 `examples/.local/`。
 那个目录被 gitignore——社区卡的 license / 体积 / 内容差异太大无法分发，
