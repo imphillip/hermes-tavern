@@ -386,12 +386,21 @@ def _cmd_history(args: argparse.Namespace) -> int:
 
 
 def _cmd_revert(args: argparse.Namespace) -> int:
-    target = library.revert_to(args.home, args.target)
-    soul_state = "yes" if target.has_soul_md else "(none — live SOUL.md removed)"
-    hermes_state = "yes" if target.has_hermes_md else "(none — live HERMES.md removed)"
-    print(f"reverted to snapshot {target.id} ({target.action}: {target.name})")
-    print(f"  SOUL.md:   {soul_state}")
-    print(f"  HERMES.md: {hermes_state}")
+    snap = library.revert_to(args.home, args.target)
+    print(f"reverted to snapshot {snap.id} ({snap.action}: {snap.name})")
+    # Print one line per file the snapshot tracked, showing whether it
+    # was restored or removed. Falls back to the legacy SOUL/HERMES
+    # pair when the snapshot is from a pre-v2.0 manifest with no
+    # `captured` dict.
+    captured = snap.captured or {
+        "SOUL.md": snap.has_soul_md,
+        "HERMES.md": snap.has_hermes_md,
+    }
+    longest = max((len(fn) for fn in captured), default=8)
+    for fn in sorted(captured):
+        present = captured[fn]
+        state = "restored" if present else f"(none — live {fn} removed)"
+        print(f"  {fn.ljust(longest)} : {state}")
     print(f"\nto activate: start your runtime from {args.home}", file=sys.stderr)
     print("(if the runtime is already running, start a fresh session — for "
           "Hermes use /new or /reset — to apply this revert)",

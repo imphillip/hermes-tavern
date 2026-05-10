@@ -79,30 +79,53 @@ or `/reset`). SoulTavern prints this reminder to stderr after every
 ## `.snapshots/` — persona-file history
 
 Every `import` / `switch` / `revert` captures the resulting on-disk
-state into `cards/.snapshots/<NNNN>_<ts>_<name>/`. Before the very
-first mutation, a special `pristine` snapshot records the
-pre-SoulTavern state (which may legitimately be "no SOUL.md or
-companion file existed"):
+state of every agent file SoulTavern is allowed to touch into
+`cards/.snapshots/<NNNN>_<ts>_<name>/`. The captured set is the
+**union of every filename any registered target might write** —
+currently SOUL.md, HERMES.md, AGENTS.md, IDENTITY.md. Capturing the
+union (rather than just the active target's file set) is what makes
+cross-target reverts work: an `--target openclaw` import followed by
+`revert --to pristine` correctly restores any pre-existing AGENTS.md
+and IDENTITY.md the user had before SoulTavern touched the workspace.
+
+Before the very first mutation, a special `pristine` snapshot records
+the pre-SoulTavern state (which may legitimately be "none of the
+managed files existed"):
 
 ```
 <home>/cards/.snapshots/
 ├── 0001_pristine/
 │   ├── manifest.json
-│   └── (SOUL.md / companion file if they existed pre-SoulTavern)
+│   ├── SOUL.md         # only present if it existed pre-SoulTavern
+│   ├── HERMES.md       # ditto
+│   ├── AGENTS.md       # ditto (full file, including any user content)
+│   └── IDENTITY.md     # ditto
 ├── 0002_20260502T130000_Aldous/
 │   ├── manifest.json
-│   ├── SOUL.md
-│   └── (companion file)
+│   └── (whichever managed files existed at snap time)
 └── ...
 ```
 
+The manifest's `captured` dict records presence per filename:
+`{"SOUL.md": true, "HERMES.md": false, "AGENTS.md": true, ...}`.
+Restore copies `true` files from the snap dir into the live workspace
+and unlinks `false` files from the live workspace — that's what
+correctly returns the workspace to pristine even when the live state
+has files the snapshot didn't.
+
 `history.py --home <home>` lists snapshots chronologically.
 `revert.py --home <home> --to <id|name|pristine|previous>` restores
-any of them — correctly removing the live persona files when the
-target snapshot didn't have them (this is what makes "revert to
-pristine when nothing existed before" work). The active record is
-restored from the snapshot's manifest, or cleared if the target had
-none.
+any of them. The active record is restored from the snapshot's
+manifest, or cleared if the snapshot had none.
+
+### Backward compatibility
+
+Manifests written by pre-v2.0 versions lack `target` and `captured`
+fields and only stored SOUL.md + HERMES.md. `Snapshot.from_json`
+upgrades them on read: `target` defaults to `"hermes"`, `captured` is
+derived from the legacy `has_soul_md` / `has_hermes_md` flags. Old
+histories revert correctly; AGENTS.md / IDENTITY.md are simply not in
+their captured set and are left untouched.
 
 The revert action is itself recorded as a new snapshot for
 traceability.

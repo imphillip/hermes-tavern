@@ -1,24 +1,41 @@
-"""Per-mutation snapshot history of SOUL.md and HERMES.md.
+"""Per-mutation snapshot history of every agent file SoulTavern touches.
 
 Every ``import`` / ``switch`` captures the resulting on-disk state into
-``<HERMES_HOME>/cards/.snapshots/<NNNN>_<ts>_<name>/``. Before the very
+``<home>/cards/.snapshots/<NNNN>_<ts>_<name>/``. Before the very
 first mutation, a special ``pristine`` snapshot records the
-pre-HermesTavern state — which may legitimately mean "no SOUL.md or
-HERMES.md existed". ``revert`` restores any of these snapshots,
-correctly removing live files when the target snapshot didn't have
-them.
+pre-SoulTavern state — which may legitimately mean "no agent files
+existed".
+
+``revert`` restores any of these snapshots, correctly removing live
+files when the target snapshot didn't have them.
+
+Coverage (v2.0+): every file any registered target might write is
+captured on every snapshot — currently SOUL.md, HERMES.md, AGENTS.md,
+IDENTITY.md. This makes cross-target reverts predictable: if the user
+ran openclaw then switched to hermes then reverted to pristine, the
+pre-SoulTavern AGENTS.md / IDENTITY.md content (or absence) is fully
+restored along with SOUL.md / HERMES.md.
 
 Layout::
 
-    <HERMES_HOME>/cards/.snapshots/
+    <home>/cards/.snapshots/
     ├── 0001_pristine/
     │   ├── manifest.json
-    │   └── (SOUL.md / HERMES.md if they existed pre-HermesTavern)
+    │   ├── SOUL.md          (if it existed pre-SoulTavern)
+    │   ├── HERMES.md        (ditto, hermes target)
+    │   ├── AGENTS.md        (ditto, openclaw target — full file)
+    │   └── IDENTITY.md      (ditto, openclaw target)
     ├── 0002_20260502T130000_Aldous/
     │   ├── manifest.json
-    │   ├── SOUL.md
-    │   └── HERMES.md
+    │   └── (whichever managed files existed at snap time)
     └── ...
+
+Backward compatibility: legacy manifests written by pre-v2.0 versions
+captured only SOUL.md + HERMES.md and lacked the ``target`` /
+``captured`` fields. ``Snapshot.from_json`` upgrades them on read —
+``target`` defaults to ``"hermes"``, ``captured`` is derived from
+``has_soul_md`` / ``has_hermes_md``. The legacy snap-dir layout is
+read unchanged.
 """
 
 from __future__ import annotations
@@ -26,10 +43,10 @@ from __future__ import annotations
 import json
 import re
 import shutil
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
 
 SNAPSHOTS_DIR_NAME = ".snapshots"
 PRISTINE = "pristine"
@@ -48,9 +65,17 @@ class Snapshot:
     action: str           # "pristine" | "import" | "switch" | "revert"
     name: str             # character name, or "pristine"
     card_file: str | None
-    has_soul_md: bool
-    has_hermes_md: bool
+    has_soul_md: bool     # legacy field; mirrors captured["SOUL.md"]
+    has_hermes_md: bool   # legacy field; mirrors captured["HERMES.md"]
     active_record: dict[str, Any] | None = None
+    # v2.0 additions:
+    target: str = "hermes"
+    # `captured` keys are filenames (relative to home), values mark
+    # whether the file existed on disk at snap time. Restore uses this
+    # dict — files marked True are copied from snap_dir; files marked
+    # False are unlinked from live position. Files not in the dict are
+    # left untouched.
+    captured: dict[str, bool] = field(default_factory=dict)
 
     @property
     def dir_name(self) -> str:
@@ -66,6 +91,16 @@ class Snapshot:
     @classmethod
     def from_json(cls, text: str) -> Snapshot:
         payload = json.loads(text)
+        # Back-compat: legacy manifests pre-v2.0 lack `target` and
+        # `captured`. Derive them from the has_* flags so the rest of
+        # the code can treat all snapshots uniformly.
+        if "target" not in payload:
+            payload["target"] = "hermes"
+        if "captured" not in payload:
+            payload["captured"] = {
+                "SOUL.md": bool(payload.get("has_soul_md")),
+                "HERMES.md": bool(payload.get("has_hermes_md")),
+            }
         fields = {k: payload.get(k) for k in cls.__dataclass_fields__}
         return cls(**fields)  # type: ignore[arg-type]
 
@@ -86,32 +121,47 @@ def _next_id(home: Path) -> str:
     return f"{(max(nums) if nums else 0) + 1:04d}"
 
 
-def _capture_files(snap_dir: Path, soul: Path, hermes: Path) -> tuple[bool, bool]:
+def _capture(snap_dir: Path, home: Path, filenames: Iterable[str]) -> dict[str, bool]:
+    """Copy each named file from ``home`` into ``snap_dir`` if it exists.
+
+    Returns a presence dict ``{filename: existed?}``. The dict always
+    contains every filename in ``filenames``, even ones that didn't
+    exist — the False entries are what makes restore correctly unlink
+    files that were absent at snap time.
+    """
     snap_dir.mkdir(parents=True, exist_ok=True)
-    has_soul = soul.exists()
-    has_hermes = hermes.exists()
-    if has_soul:
-        shutil.copy2(soul, snap_dir / "SOUL.md")
-    if has_hermes:
-        shutil.copy2(hermes, snap_dir / "HERMES.md")
-    return has_soul, has_hermes
+    captured: dict[str, bool] = {}
+    for fn in filenames:
+        src = home / fn
+        if src.exists() and src.is_file():
+            shutil.copy2(src, snap_dir / fn)
+            captured[fn] = True
+        else:
+            captured[fn] = False
+    return captured
 
 
 def ensure_pristine(
     home: Path,
     *,
-    soul: Path,
-    hermes: Path,
+    filenames: Iterable[str],
+    target: str,
 ) -> Snapshot | None:
-    """Capture the pre-HermesTavern state if no snapshots exist yet.
+    """Capture the pre-SoulTavern state if no snapshots exist yet.
 
     Idempotent — returns None if any snapshot already exists. The
-    pristine snapshot legitimately captures "no files" when SOUL.md /
-    HERMES.md were absent before HermesTavern's first write.
+    pristine snapshot legitimately captures "no files" when none of
+    the managed files were present before SoulTavern's first write.
+
+    ``filenames`` is the union of every managed filename across all
+    registered targets (passed in by the caller — library.py — to keep
+    snapshots.py target-agnostic). ``target`` is recorded as the
+    target of the upcoming first import; informational only.
     """
     sd = snapshots_dir(home)
     if sd.exists() and any(p for p in sd.iterdir() if _DIR_RE.match(p.name)):
         return None
+    filenames_list = list(filenames)
     snap = Snapshot(
         id=_next_id(home),
         created_at=_now(),
@@ -121,11 +171,14 @@ def ensure_pristine(
         has_soul_md=False,
         has_hermes_md=False,
         active_record=None,
+        target=target,
+        captured={},
     )
     snap_dir = sd / snap.dir_name
-    has_soul, has_hermes = _capture_files(snap_dir, soul, hermes)
-    snap.has_soul_md = has_soul
-    snap.has_hermes_md = has_hermes
+    captured = _capture(snap_dir, home, filenames_list)
+    snap.captured = captured
+    snap.has_soul_md = captured.get("SOUL.md", False)
+    snap.has_hermes_md = captured.get("HERMES.md", False)
     (snap_dir / "manifest.json").write_text(snap.to_json(), "utf-8")
     return snap
 
@@ -136,11 +189,18 @@ def take_snapshot(
     action: str,
     name: str,
     card_file: str | None,
-    soul: Path,
-    hermes: Path,
+    filenames: Iterable[str],
+    target: str,
     active_record: dict[str, Any] | None,
 ) -> Snapshot:
-    """Capture current SOUL.md + HERMES.md as a new snapshot."""
+    """Capture the current state of every managed file as a new snapshot.
+
+    ``filenames`` should be the union of every managed filename across
+    all registered targets, same as ``ensure_pristine``. Snapshotting
+    the union (rather than only the active target's file set) makes
+    cross-target reverts predictable.
+    """
+    filenames_list = list(filenames)
     snap = Snapshot(
         id=_next_id(home),
         created_at=_now(),
@@ -150,11 +210,14 @@ def take_snapshot(
         has_soul_md=False,
         has_hermes_md=False,
         active_record=active_record,
+        target=target,
+        captured={},
     )
     snap_dir = snapshots_dir(home) / snap.dir_name
-    has_soul, has_hermes = _capture_files(snap_dir, soul, hermes)
-    snap.has_soul_md = has_soul
-    snap.has_hermes_md = has_hermes
+    captured = _capture(snap_dir, home, filenames_list)
+    snap.captured = captured
+    snap.has_soul_md = captured.get("SOUL.md", False)
+    snap.has_hermes_md = captured.get("HERMES.md", False)
     (snap_dir / "manifest.json").write_text(snap.to_json(), "utf-8")
     return snap
 
@@ -218,32 +281,26 @@ def find_snapshot(home: Path, query: str) -> Snapshot:
     raise SnapshotError(f"no snapshot matching {q!r}")
 
 
-def restore_files(
-    snap: Snapshot,
-    home: Path,
-    *,
-    soul: Path,
-    hermes: Path,
-) -> None:
-    """Apply ``snap``'s SOUL.md / HERMES.md to the live positions.
+def restore_files(snap: Snapshot, home: Path) -> None:
+    """Apply ``snap`` to the live file positions.
 
-    Crucially, when the snapshot did NOT have a file, the live file is
-    **removed** rather than overwritten with empty content. This is
-    what makes "revert to pristine when nothing existed" work.
+    Walks ``snap.captured``: for each filename, if the snapshot has the
+    file (presence == True), copy from snap_dir into home. If the
+    snapshot recorded the file as absent (presence == False), unlink
+    the live file. Files not mentioned in ``captured`` are left alone.
+
+    This is what makes "revert to pristine when nothing existed" work
+    — the unlink branch removes the live SOUL.md / companion / extras
+    rather than leaving them in place.
     """
     snap_dir = snapshots_dir(home) / snap.dir_name
-    soul_src = snap_dir / "SOUL.md"
-    hermes_src = snap_dir / "HERMES.md"
-
-    if soul_src.exists():
-        shutil.copy2(soul_src, soul)
-    elif soul.exists():
-        soul.unlink()
-
-    if hermes_src.exists():
-        shutil.copy2(hermes_src, hermes)
-    elif hermes.exists():
-        hermes.unlink()
+    for fn, was_present in snap.captured.items():
+        live = home / fn
+        snap_src = snap_dir / fn
+        if was_present and snap_src.exists():
+            shutil.copy2(snap_src, live)
+        elif not was_present and live.exists():
+            live.unlink()
 
 
 def _now() -> str:

@@ -43,12 +43,25 @@ it works.
   the import.
 - **Zero runtime dependencies.** `pyproject.toml` `dependencies = []`.
   pyproject is now dev-tooling-only (pytest / ruff / mypy).
+- **Snapshot now covers every managed agent file** (latent v0.6→v1.0
+  bug, fixed in v2.0). Pre-v2.0 snapshots only captured SOUL.md and
+  HERMES.md, which was complete for the hermes target but missed
+  AGENTS.md and IDENTITY.md for the openclaw target — `revert --to
+  pristine` after an openclaw import would leave the managed section
+  in `AGENTS.md` and the overwritten `IDENTITY.md` untouched. Snapshot
+  now captures the union of every filename any registered target
+  might write, with a presence dict per file. Restore copies present
+  files and unlinks absent ones, so reverts are predictable across
+  targets and pre-existing user files (an OpenClaw workspace's default
+  `IDENTITY.md`, a user's customized `AGENTS.md`) are correctly
+  preserved through pristine. Legacy manifests (pre-v2.0) read
+  unchanged via a back-compat upgrade in `Snapshot.from_json`.
 
 ### What's the same
 
 - Output bytes for `--target hermes` and `--target openclaw` match v1.0
-  for the small-card path. (212 tests still pass; the openclaw e2e suite
-  asserts on real output.)
+  for the small-card path. (217 tests pass — 212 from the pre-existing
+  suite plus 5 new openclaw revert tests covering the lifecycle fix.)
 - All flag names, help text, exit codes, error wording.
 - All references in `references/` are unchanged.
 - `<home>/cards/.active.json` schema unchanged. Existing imported

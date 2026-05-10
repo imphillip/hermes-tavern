@@ -351,3 +351,139 @@ def test_cli_current_shows_target_and_extras(
     assert "SOUL.md:" in out
     assert "AGENTS.md:" in out
     assert "IDENTITY.md:" in out
+
+
+# ---------- revert (lifecycle / backup correctness) ----------
+
+
+def test_openclaw_revert_to_pristine_on_clean_workspace(
+    home: Path, fixtures_dir: Path,
+):
+    """Revert-to-pristine after an openclaw import should leave NO
+    SoulTavern-managed files behind: SOUL.md / AGENTS.md / IDENTITY.md
+    should all be unlinked, returning the workspace to the
+    pre-SoulTavern state (empty)."""
+    from soultavern.targets import OPENCLAW
+
+    library.import_card(
+        home, fixtures_dir / "v2_minimal.json",
+        target=OPENCLAW, overwrite=True,
+    )
+    assert (home / "SOUL.md").exists()
+    assert (home / "AGENTS.md").exists()
+    assert (home / "IDENTITY.md").exists()
+
+    library.revert_to(home, "pristine")
+
+    # All three target-managed files removed because pristine had none
+    assert not (home / "SOUL.md").exists()
+    assert not (home / "AGENTS.md").exists()
+    assert not (home / "IDENTITY.md").exists()
+
+
+def test_openclaw_revert_preserves_pre_existing_user_agents_md(
+    home: Path, fixtures_dir: Path,
+):
+    """When the user had AGENTS.md content before SoulTavern touched the
+    workspace, revert-to-pristine restores it byte-for-byte — including
+    content that was outside the marker section."""
+    from soultavern.targets import OPENCLAW
+
+    home.mkdir(parents=True, exist_ok=True)
+    user_agents = "# My AGENTS.md\n\nMy personal rules.\n\nAnother paragraph.\n"
+    (home / "AGENTS.md").write_text(user_agents, "utf-8")
+
+    library.import_card(
+        home, fixtures_dir / "v2_minimal.json",
+        target=OPENCLAW, overwrite=True,
+    )
+    # Post-import: AGENTS.md has both user content + managed section
+    after_import = (home / "AGENTS.md").read_text()
+    assert "My personal rules." in after_import
+    assert "<!-- BEGIN soultavern:character -->" in after_import
+
+    library.revert_to(home, "pristine")
+
+    # Restored to exactly the pre-SoulTavern content
+    assert (home / "AGENTS.md").read_text() == user_agents
+    assert not (home / "SOUL.md").exists()
+    assert not (home / "IDENTITY.md").exists()
+
+
+def test_openclaw_revert_restores_pre_existing_identity_md(
+    home: Path, fixtures_dir: Path,
+):
+    """OpenClaw workspaces ship with a default IDENTITY.md. SoulTavern's
+    import overwrites it; revert-to-pristine must restore the original
+    bytes (the pristine snapshot captures the pre-existing file)."""
+    from soultavern.targets import OPENCLAW
+
+    home.mkdir(parents=True, exist_ok=True)
+    user_identity = "# IDENTITY.md\n\nName: my agent\nVibe: thoughtful\n"
+    (home / "IDENTITY.md").write_text(user_identity, "utf-8")
+
+    library.import_card(
+        home, fixtures_dir / "v2_minimal.json",
+        target=OPENCLAW, overwrite=True,
+    )
+    after_import = (home / "IDENTITY.md").read_text()
+    assert "my agent" not in after_import  # overwritten by character metadata
+
+    library.revert_to(home, "pristine")
+    assert (home / "IDENTITY.md").read_text() == user_identity
+
+
+def test_openclaw_revert_after_switch_between_cards(
+    home: Path, fixtures_dir: Path,
+):
+    """Two openclaw imports back-to-back, then revert to the first one's
+    snapshot. Both SOUL.md and IDENTITY.md should reflect card #1's
+    content (not card #2's), and the AGENTS.md managed section should
+    show card #1's character."""
+    from soultavern.targets import OPENCLAW
+
+    library.import_card(
+        home, fixtures_dir / "v2_minimal.json",  # Echo
+        target=OPENCLAW, overwrite=True,
+    )
+    snaps_after_first = library.list_history(home)
+    first_import_id = snaps_after_first[-1].id
+
+    library.import_card(
+        home, fixtures_dir / "v2_full.json",  # different character
+        target=OPENCLAW, overwrite=True,
+    )
+    # IDENTITY.md should now be the second character's
+    after_second = (home / "IDENTITY.md").read_text()
+    assert "Echo" not in after_second
+
+    library.revert_to(home, first_import_id)
+
+    # SOUL + IDENTITY now back to card #1 (Echo)
+    assert "Echo" in (home / "IDENTITY.md").read_text()
+    assert "Echo" in (home / "SOUL.md").read_text()
+    # AGENTS.md managed section should also be Echo's
+    assert "Active character: Echo" in (home / "AGENTS.md").read_text()
+
+
+def test_legacy_snapshot_manifest_reads_as_hermes_target(home: Path):
+    """Manifests written by pre-v2.0 versions lack `target` and
+    `captured` fields. Snapshot.from_json upgrades them to the hermes
+    default with captured derived from has_soul_md / has_hermes_md, so
+    older histories still revert correctly."""
+    from soultavern import snapshots
+
+    legacy_manifest = {
+        "id": "0001",
+        "created_at": "2026-04-01T12:00:00+00:00",
+        "action": "pristine",
+        "name": "pristine",
+        "card_file": None,
+        "has_soul_md": False,
+        "has_hermes_md": False,
+        "active_record": None,
+        # NO target, NO captured — this is the legacy shape
+    }
+    snap = snapshots.Snapshot.from_json(json.dumps(legacy_manifest))
+    assert snap.target == "hermes"
+    assert snap.captured == {"SOUL.md": False, "HERMES.md": False}
