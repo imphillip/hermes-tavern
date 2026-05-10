@@ -1,6 +1,6 @@
 # SillyTavern V2 character card cheat sheet
 
-Quick reference for the fields HermesTavern reads. Authoritative spec is
+Quick reference for the fields SoulTavern reads. Authoritative spec is
 at <https://github.com/malfoyslastname/character-card-spec-v2>.
 
 ## Container shapes
@@ -9,10 +9,12 @@ A card on disk can be one of:
 
 - **JSON V2 (preferred)** — `{ "spec": "chara_card_v2", "spec_version": "2.0", "data": { ... } }`
 - **JSON V1 (legacy)** — flat object with `name`, `description`, `personality`, …
-  HermesTavern lifts this into the V2 shape transparently.
-- **PNG** — a regular PNG with a tEXt chunk under key `chara`. The value
-  is base64-encoded JSON (V1 or V2).
-- **YAML** — same content as JSON, less common.
+  SoulTavern lifts this into the V2 shape transparently.
+- **PNG** — a regular PNG with a `chara` text chunk (tEXt / iTXt /
+  zTXt). The value is base64-encoded JSON (V1 or V2).
+
+YAML cards (`.yaml` / `.yml`) were supported pre-v2.0 but are no
+longer accepted; convert to JSON if you have any.
 
 ## Fields under `data`
 
@@ -30,7 +32,7 @@ A card on disk can be one of:
 | `tags[]` | Free tags. | Stored only as comments. |
 | `creator`, `creator_notes`, `creator_version` | Authoring metadata. | Comments only. |
 | `extensions` | Vendor-specific blob. | Preserved as comment, not parsed. |
-| `character_book` | Lorebook (see below). | Becomes HERMES.md if present. |
+| `character_book` | Lorebook (see below). | Becomes the companion file (`HERMES.md` for hermes target, `AGENTS.md` managed section for openclaw target). |
 
 ## `character_book`
 
@@ -42,7 +44,7 @@ A card on disk can be one of:
 
 Each entry can have:
 
-- `keys[]` — keywords ST uses to gate injection; HermesTavern ignores
+- `keys[]` — keywords ST uses to gate injection; SoulTavern ignores
   gating but preserves the keys as a comment
 - `content` — the entry body (rendered as the section content)
 - `comment` — author label (preferred for the section heading)
@@ -63,11 +65,11 @@ These appear all over the text fields:
 | `<BOT>` | Legacy form of `{{char}}` |
 | `<USER>` | Legacy form of `{{user}}` |
 
-HermesTavern substitutes all four (case-insensitive, non-recursive).
+SoulTavern substitutes all four (case-insensitive, non-recursive).
 `{{user}}` becomes whatever was passed to `--user-noun` (default
 `"the visitor"`).
 
-## What HermesTavern does NOT support
+## What SoulTavern does NOT support
 
 - Keyword-gated lorebook injection — the lorebook is rendered as one
   always-on document

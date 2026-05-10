@@ -1,5 +1,76 @@
 # Changelog
 
+## 2.0.0 — Skill-folder only (drop CLI install, drop third-party deps)
+
+v2.0 collapses SoulTavern to a single self-contained skill folder. There
+is no `soultavern` binary on PATH any more, no wheel to install, no
+`pipx` / `uv tool` / venv shim, no third-party Python dependencies. The
+skill is one folder; you invoke it by running scripts in `scripts/`
+directly. Drop the folder anywhere your runtime reads skills from and
+it works.
+
+### Breaking changes
+
+- **No CLI on PATH.** `soultavern` and the `hermes-tavern` backward-compat
+  alias are both gone. Replace `soultavern <subcommand> ...` with
+  `python3 <skill_dir>/scripts/<subcommand>.py ...`. Same flags, same
+  exit codes, same output.
+- **No wheel.** `assets/soultavern-*.whl` removed; `pyproject.toml`
+  loses `[project.scripts]` and the build-system block. The project is
+  no longer "built" — it's distributed as a skill folder.
+- **No install scripts.** `scripts/install.sh`, `scripts/uninstall.sh`,
+  and `scripts/import_card.sh` are gone.
+- **YAML cards no longer supported.** `.yaml` / `.yml` inputs raise
+  `UnsupportedCardError`. JSON and PNG remain. Convert YAML cards to
+  JSON if you have any (rare in the SillyTavern ecosystem).
+- **Source layout.** `src/soultavern/` moved to
+  `skills/soultavern/scripts/soultavern/` (the engine package lives
+  beside the entry shims; `lib/` would be non-standard for a skill
+  folder). Tests pick this up via `conftest.py`; external code that
+  did `pip install -e .` should switch to invoking the scripts.
+
+### Implementation changes
+
+- **Pillow → stdlib.** PNG `chara` chunk parsing reimplemented in pure
+  stdlib (`struct` + `zlib`). Supports `tEXt` / `iTXt` / `zTXt`. Test
+  fixtures use a stdlib PNG builder in `tests/conftest.py`.
+- **Jinja2 → Python functions.** All eight `.j2` templates rewritten
+  as Python rendering functions colocated with each `Target` instance
+  in `skills/soultavern/scripts/soultavern/targets/{hermes,openclaw}.py`.
+  `Target.soul_template` (str) replaced with `Target.soul_renderer`
+  (callable); same for companion / curated / extra-file fields.
+- **PyYAML → removed.** YAML branch in `parse.py` deleted along with
+  the import.
+- **Zero runtime dependencies.** `pyproject.toml` `dependencies = []`.
+  pyproject is now dev-tooling-only (pytest / ruff / mypy).
+
+### What's the same
+
+- Output bytes for `--target hermes` and `--target openclaw` match v1.0
+  for the small-card path. (212 tests still pass; the openclaw e2e suite
+  asserts on real output.)
+- All flag names, help text, exit codes, error wording.
+- All references in `references/` are unchanged.
+- `<home>/cards/.active.json` schema unchanged. Existing imported
+  workspaces don't need migration.
+
+### Migration
+
+```bash
+# Old (v1.0):
+soultavern import --card foo.png --home ~/ws --target openclaw
+
+# New (v2.0):
+python3 /path/to/SoulTavern/skills/soultavern/scripts/import.py \
+    --card foo.png --home ~/ws --target openclaw
+```
+
+If you have a v1.0 install with `soultavern` on PATH, remove it (it's
+no longer maintained). Then `git pull` (or re-clone) SoulTavern and
+point your runtime / agent at the new skill folder.
+
+---
+
 ## 1.0.0 — SoulTavern (rename + multi-target)
 
 The HermesTavern → SoulTavern rebrand, with multi-target support

@@ -49,19 +49,18 @@ def test_malformed_json(tmp_path: Path):
 
 
 def test_png_without_chara(tmp_path: Path):
-    from PIL import Image
+    from conftest import build_png
 
     bad = tmp_path / "plain.png"
-    Image.new("RGB", (2, 2), color="black").save(bad, "PNG")
+    bad.write_bytes(build_png(chara_value=None))
     with pytest.raises(InvalidCardError):
         load_card(bad)
 
 
-def test_yaml_card(tmp_path: Path):
-    src = json.loads((Path(__file__).parent / "fixtures" / "v2_minimal.json").read_text())
+def test_yaml_no_longer_supported(tmp_path: Path):
+    """v2.0 dropped YAML support — .yaml/.yml cards now hit
+    UnsupportedCardError."""
     yaml_path = tmp_path / "card.yaml"
-    import yaml
-
-    yaml_path.write_text(yaml.safe_dump(src), "utf-8")
-    data = load_card(yaml_path)
-    assert data["name"] == "Echo"
+    yaml_path.write_text("name: Echo\n", "utf-8")
+    with pytest.raises(UnsupportedCardError):
+        load_card(yaml_path)

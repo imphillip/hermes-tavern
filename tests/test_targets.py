@@ -61,14 +61,16 @@ def test_default_target_is_hermes():
     assert DEFAULT_TARGET.name == "hermes"
 
 
-def test_hermes_target_preserves_v05x_constants():
-    """The values folded into the Target dataclass must match what
-    library / render exported as module-level constants in v0.5.x."""
+def test_hermes_target_preserves_constants():
+    """Filenames and budgets stay stable across versions; existing
+    HERMES_HOME directories on disk depend on these. v2.0 replaced the
+    Jinja template-name fields with renderer callables — verify those
+    are present and callable."""
     assert HERMES.soul_filename == "SOUL.md"
     assert HERMES.companion_filename == "HERMES.md"
-    assert HERMES.soul_template == "SOUL.md.j2"
-    assert HERMES.companion_template == "HERMES.md.j2"
-    assert HERMES.curated_soul_template == "SOUL.md.curated.j2"
+    assert callable(HERMES.soul_renderer)
+    assert callable(HERMES.companion_renderer)
+    assert callable(HERMES.curated_soul_renderer)
     assert HERMES.soul_budget == 19_000
     assert HERMES.companion_budget == 19_000
     assert HERMES.oversize_threshold == 15_000

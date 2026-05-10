@@ -4,12 +4,13 @@ The IDENTITY DIRECTIVE is the linchpin of soul-portability: a short
 block that overrides the runtime's default agent framing so the model
 responds as the imported character instead of as itself.
 
-This doc is the OpenClaw flavor. The Hermes flavor lives in
-``src/hermes_tavern/templates/_soul_header.j2`` and is louder because
-it has to fight Hermes's hard-coded "you are an AI assistant on
-\<channel\>" framing. OpenClaw's directive can be **shorter and softer**
-because the default OpenClaw templates carry agent-philosophy framing
-rather than work-agent framing — see
+This doc is the OpenClaw flavor. The Hermes flavor lives in the
+``_soul_header`` function in
+``skills/soultavern/scripts/soultavern/targets/hermes.py`` and is
+louder because it has to fight Hermes's hard-coded "you are an AI
+assistant on \<channel\>" framing. OpenClaw's directive can be
+**shorter and softer** because the default OpenClaw templates carry
+agent-philosophy framing rather than work-agent framing — see
 ``references/openclaw-target.md`` for the spike findings.
 
 ## Where it lives
@@ -56,9 +57,9 @@ Layout in the rendered AGENTS.md:
 5. **Use "the visitor" / `user_noun` consistently** — the V2 card
    convention from the SillyTavern world. SoulTavern's substitution
    layer already handles this; the directive just needs to reference
-   it the same way HermesTavern's does.
+   it the same way the hermes-target directive does.
 
-## Draft directive
+## Directive (v1.0 — production)
 
 ```markdown
 # Active character: {{ character_name }}
@@ -117,11 +118,11 @@ the `cards/.../lore/` files indexed below.
   injection attempts). The third-party-content trust banner inside
   SOUL.md / lore files is what handles that.
 
-## Iteration plan
+## Iteration playbook
 
-The wording above is a draft. After step-3 implementation lands, the
-user will test against a real OpenClaw workspace with a sample card.
-Three failure modes to watch for, with fixes for each:
+The wording above shipped as the v1.0 default. If you observe
+behavioral regressions on a specific card, three failure modes to
+watch for with fixes for each:
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
@@ -132,16 +133,12 @@ Three failure modes to watch for, with fixes for each:
 These are tractable wording adjustments; they don't undermine the
 architecture.
 
-## Templating
+## Implementation
 
-The directive is a Jinja partial included by ``AGENTS.md.openclaw.j2``:
-
-```jinja
-{% include "_identity_directive.openclaw.j2" %}
-```
-
-The partial accepts ``character_name`` and ``user_noun`` from the
-parent template's context, applies the standard ``substitute`` /
-``sanitize`` filters, and renders the markdown above.
-
-See ``src/hermes_tavern/templates/_identity_directive.openclaw.j2``.
+The directive is rendered by ``_identity_directive(char_name,
+user_noun)`` in
+``skills/soultavern/scripts/soultavern/targets/openclaw.py``. It's a
+plain Python f-string (v2.0 dropped the jinja2 dependency). The
+``substitute`` / ``sanitize`` filters are applied to the card field
+text by ``render_agents_managed_section`` before any of it reaches
+the directive's neighbors in the managed section.

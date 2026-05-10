@@ -114,7 +114,7 @@ OVERSIZE_THRESHOLD = DEFAULT_TARGET.oversize_threshold
 
 _ACTIVE_FILE = ".active.json"
 _TRASH_DIR = ".trash"
-_CARD_SUFFIXES = {".json", ".png", ".yaml", ".yml"}
+_CARD_SUFFIXES = {".json", ".png"}
 _NAME_SAFE = re.compile(r"[^a-zA-Z0-9_.-]+")
 
 

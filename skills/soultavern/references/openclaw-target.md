@@ -1,9 +1,9 @@
-# OpenClaw target — spike findings + design baseline
+# OpenClaw target — design baseline
 
 This document captures the v0.6 spike that validated the
-**openclaw** target before step 3 implementation. It's the source of
-truth for budget constants, file-by-file write strategy, and what's
-locked vs still open.
+**openclaw** target. The design described here landed in v1.0 and is
+the current production behavior — this is the source of truth for
+budget constants, file-by-file write strategy, and design rationale.
 
 Source-of-truth references throughout point at the [OpenClaw
 repository](https://github.com/imphillip/openclaw) (paths shown are
@@ -50,7 +50,8 @@ when the agent boots.
 Default OpenClaw templates use roughly 10k of the 60k total cap
 (AGENTS.md ≈ 7k + SOUL.md ≈ 1k + TOOLS / IDENTITY / USER / HEARTBEAT
 ≈ 2k combined), leaving **~50k headroom** for character-specific
-content. Generous compared to Hermes's 19k single-file ceiling.
+content — generous in aggregate, but each individual file still has
+to fit in 12k.
 
 ## Default-template framing analysis
 
@@ -65,8 +66,8 @@ default templates are **soul-loader-friendly**, not adversarial.
   assistant is fine, but maybe you're something weirder)"*
 
 Compared to Hermes's hard-coded "you are an AI assistant on
-\<channel\>" framing (which HermesTavern's IDENTITY DIRECTIVE has to
-explicitly override), OpenClaw's templates are largely cooperative.
+\<channel\>" framing (which the hermes-target IDENTITY DIRECTIVE has
+to explicitly override), OpenClaw's templates are largely cooperative.
 The OpenClaw IDENTITY DIRECTIVE can be **shorter and softer** —
 mainly affirming the character override rather than fighting hostile
 framing.
@@ -74,7 +75,8 @@ framing.
 This invalidates the openclaw-tavern memo's concern about needing a
 `--suppress-workspace-bootstrap` flag. **The stub-and-restore
 mechanism for TOOLS / BOOTSTRAP / HEARTBEAT / USER is not required.**
-Re-evaluate only if step 3 implementation hits real conflicts.
+v1.0 confirmed this: the openclaw target ships without that mechanism
+and the IDENTITY DIRECTIVE alone is sufficient.
 
 ## File-by-file write strategy
 
@@ -91,7 +93,7 @@ destroy user customizations.
 ```markdown
 <!-- BEGIN soultavern:character -->
 <!-- managed by soultavern; safe to delete the markers + content
-     between them, or run `soultavern delete --target openclaw` -->
+     between them, or run SoulTavern's delete.py against this workspace -->
 
 # Active character: {{ character_name }}
 
@@ -153,18 +155,18 @@ the card's character_book. `delete` / `revert`: remove the directory.
 ### `USER.md` — read-only (optional)
 
 SoulTavern must NOT write USER.md — that's OpenClaw's user-profile
-slot, the agent itself maintains it. Three implications for v0.7:
+slot, the agent itself maintains it. Implications:
 
 1. The Hermes-style `{{user}}` substitution defaults to "the
    visitor" via `--user-noun`.
-2. **Optional enhancement**: parse USER.md for "What to call them"
-   and use that as the substitution source, falling back to
-   `--user-noun` if not set. Defer to v0.7+ design pass.
+2. **Optional enhancement (still open)**: parse USER.md for "What to
+   call them" and use that as the substitution source, falling back
+   to `--user-noun` if not set. Not implemented in v1.0/v2.0.
 
-## Target dataclass extensions needed in step 3
+## Target dataclass extensions (landed in v1.0 / refined in v2.0)
 
-The current `Target` dataclass models a single companion file with
-replace semantics. The OpenClaw target needs:
+The pre-spike `Target` dataclass modeled a single companion file with
+replace semantics. The OpenClaw target needed three new fields:
 
 ```python
 @dataclass(frozen=True)
@@ -175,8 +177,9 @@ class Target:
     extra_files: tuple[ExtraFile, ...] = ()  # IDENTITY.md, etc.
 ```
 
-Lock the shape after the first real OpenClaw template render lands —
-premature abstraction in step 2 would have been a mistake.
+These shipped in v1.0. v2.0 additionally replaced the
+`soul_template: str` / `companion_template: str` / etc. fields with
+callable `*_renderer` fields when the jinja2 dependency was removed.
 
 ## What the original memo got wrong
 
@@ -193,19 +196,21 @@ The memo correctly identified: AGENTS.md as the override authority,
 managed-section append as the write strategy, USER.md as off-limits,
 multi-character routing as out of scope, no plugin / no patches.
 
-## Open questions for step 3
+## Open questions (still open after v1.0/v2.0)
 
-1. Exact IDENTITY DIRECTIVE wording for OpenClaw — the spike showed
-   the framing is friendlier than expected, so the directive can be
-   shorter than Hermes's. Draft + iterate when implementing.
+1. ~~Exact IDENTITY DIRECTIVE wording for OpenClaw~~ — landed in v1.0;
+   see `openclaw-identity-directive.md` for the wording and iteration
+   playbook.
 2. Whether to also read `IDENTITY.md` to detect existing emoji /
    vibe before character import (so user's existing self-identity is
-   preserved through `revert`).
+   preserved through `revert`). Not implemented.
 3. Whether `user_noun` should opportunistically read USER.md (see
-   §USER.md above).
-4. Prompt-budget surveillance: should `validate --target openclaw`
+   §USER.md above). Not implemented; current default is the
+   `--user-noun` flag with fallback "the visitor".
+4. Prompt-budget surveillance: should `validate.py --target openclaw`
    warn when the **post-import total** would exceed
    `bootstrapTotalMaxChars`? (The 60k cap is a session-level signal.)
+   Not implemented.
 
-None of these block step 3 — they're refinements to design while
-implementing.
+These are refinements, not blockers — the target is production
+without them.

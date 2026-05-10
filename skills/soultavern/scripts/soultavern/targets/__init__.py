@@ -3,23 +3,18 @@
 The Tavern format (parse / sanitize / substitute / scan / library /
 snapshots / agent staging) is target-agnostic. The differences between
 agent runtimes — which filenames hermes / openclaw / generic write,
-which loader-priority quirks they have, which Jinja templates produce
-their persona files — live here.
-
-This module is the seam future SoulTavern multi-target work expands.
-For now (v0.6 alpha) only ``hermes`` is implemented; ``openclaw`` and
-``generic`` join in step 2 of the migration.
+which loader-priority quirks they have, which Python render functions
+produce their persona files — live here.
 
 Usage::
 
     from soultavern.targets import TARGETS, DEFAULT_TARGET
     target = TARGETS["hermes"]
     soul_filename = target.soul_filename       # "SOUL.md"
-    template = target.soul_template            # "SOUL.md.j2"
+    soul_text = target.soul_renderer(...)      # callable, returns str
 
-Consumers that don't yet plumb a `target` argument fall back to
-``DEFAULT_TARGET`` (currently the Hermes target — that's the v0.5.x
-behavior unchanged).
+Consumers that don't plumb a ``target`` argument fall back to
+``DEFAULT_TARGET`` (the Hermes target).
 """
 
 from __future__ import annotations

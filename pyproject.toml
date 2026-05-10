@@ -1,11 +1,7 @@
-[build-system]
-requires = ["setuptools>=68", "wheel"]
-build-backend = "setuptools.build_meta"
-
 [project]
 name = "soultavern"
-version = "1.0.0"
-description = "Import SillyTavern V2 character cards into multiple agent runtimes (Hermes / OpenClaw) as SOUL.md + companion files."
+version = "2.0.0"
+description = "Skill-folder-only SillyTavern V2 character card importer for Hermes / OpenClaw / generic agent runtimes."
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.10"
@@ -20,34 +16,17 @@ classifiers = [
   "Topic :: Text Processing :: Markup :: Markdown",
   "Operating System :: OS Independent",
 ]
-dependencies = [
-  "pillow>=10.0",
-  "pyyaml>=6.0",
-  "jinja2>=3.1",
-]
+# v2.0: zero runtime dependencies. The package is stdlib-only and is
+# distributed as a skill folder (skills/soultavern/), not as a wheel.
+# pyproject.toml exists only to configure dev tooling (pytest / ruff /
+# mypy). There is no [build-system] block — this project is not built.
+dependencies = []
 
 [project.optional-dependencies]
 dev = ["pytest>=7", "ruff>=0.4", "mypy>=1.8"]
 
 [project.urls]
 Homepage = "https://github.com/imphillip/SoulTavern"
-
-[project.scripts]
-soultavern = "soultavern.cli:main"
-# Backward-compat: pre-v1.0 the binary was `hermes-tavern`. Same entry
-# point, identical behavior — `--target hermes` is the default, so
-# existing scripts work unchanged.
-hermes-tavern = "soultavern.cli:main"
-
-[tool.setuptools.packages.find]
-where = ["src"]
-include = ["soultavern*"]
-
-[tool.setuptools.package-dir]
-"" = "src"
-
-[tool.setuptools.package-data]
-"soultavern" = ["templates/*.j2"]
 
 [tool.ruff]
 line-length = 100
