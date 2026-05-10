@@ -127,12 +127,74 @@ hermes skills install soultavern
 
 hub インストーラも同じ skill フォルダを置くだけで、それ以外は何もしません。
 
+### アップグレード
+
+skill フォルダを新しいバージョンで上書きします:
+
+```bash
+git pull   # SoulTavern の checkout 内で
+cp -r SoulTavern/skills/soultavern <YOUR_RUNTIME_SKILLS_DIR>/
+```
+
+(hub 経由なら `hermes skills install soultavern` を再実行するだけ。)
+
+skill フォルダは完全に静的です——内部にインストールごとの状態は何も
+ないため、上書きしても安全です。インポート済みのカード、スナップ
+ショット履歴、レンダリング済みのペルソナファイルは `<home>` workspace
+に置かれていて、アップグレードを跨いでも変化しません。`.active.json`
+の schema は v1.0 以降安定しているため、古いバージョンが書いた
+workspace に対するマイグレーションは必要ありません。
+
 ### アンインストール
 
-skill フォルダを削除する(または runtime の `skills uninstall` を実行)。
-skill はインストール時に自分のフォルダ外には何も書きません——インポート済み
-のカード・SOUL.md・スナップショットは `<home>/` workspace に残り、影響を
-受けません。
+クリーンに片付ける手順は、どの target を使ったかで分かれます。
+
+**hermes target だけ使った場合:** skill フォルダを削除するだけ:
+
+```bash
+rm -rf <YOUR_RUNTIME_SKILLS_DIR>/soultavern
+```
+
+必要なら、使ったそれぞれの `HERMES_HOME` のレンダリング済みペルソナ
+ファイルとカードライブラリも除去:
+
+```bash
+rm -rf <HERMES_HOME>/{SOUL.md,HERMES.md,cards}
+```
+
+`SOUL.md` / `HERMES.md` / `cards/` は SoulTavern が書いたものですが
+**ユーザーコンテンツ扱い**(ペルソナ + スナップショット + カード
+バックアップ)なので、保持するか消すかはユーザーに任されます。
+
+**openclaw target を使った場合:** skill フォルダを削除する **前に**、
+それぞれの workspace に対して `delete.py` を走らせてください:
+
+```bash
+# SoulTavern を使った各 openclaw workspace に対して:
+python3 <SKILL_DIR>/scripts/current.py --home <ws>          # 現在 active なカード名を確認
+python3 <SKILL_DIR>/scripts/delete.py  --card <name> --home <ws>
+
+# その後で skill フォルダを削除:
+rm -rf <YOUR_RUNTIME_SKILLS_DIR>/soultavern
+```
+
+理由: SoulTavern は workspace の `AGENTS.md` に managed section
+(`<!-- BEGIN soultavern:character -->` から対応する `END` マーカーまで)
+を書き込みます。skill フォルダを削除しただけではこの section は
+strip されません——`AGENTS.md` に静的なマークダウンとして残り続け、
+新しいセッションのたびに runtime はそのキャラクターの
+IDENTITY DIRECTIVE を読み込み続けます。active カードに対して
+`delete.py` を走らせると、managed section をきれいに strip し、
+`IDENTITY.md` と `SOUL.md` を削除し、`AGENTS.md` のマーカー外の
+ユーザー記述は保持します。
+
+`delete.py` を走らせたくない場合は、各 `AGENTS.md` を手で開いて
+`<!-- BEGIN soultavern:character -->` から
+`<!-- END soultavern:character -->` までの内容(マーカー本体を含む)を
+削除してください。
+
+`<ws>/cards/` のカードライブラリ(バックアップ + スナップショット)は
+managed section とは独立しているので、保持/削除を別々に決められます。
 
 ### 必要環境
 

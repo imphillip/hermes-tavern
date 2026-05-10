@@ -126,12 +126,71 @@ hermes skills install soultavern
 
 The hub installer drops the same skill folder; nothing else happens.
 
+### Upgrade
+
+Overwrite the skill folder with the new version:
+
+```bash
+git pull   # in your SoulTavern checkout
+cp -r SoulTavern/skills/soultavern <YOUR_RUNTIME_SKILLS_DIR>/
+```
+
+(or `hermes skills install soultavern` again, on the hub path.)
+
+The skill folder is purely static — there is no per-install state
+inside it, so overwriting is safe. Imported cards, snapshot history,
+and already-rendered persona files live in your `<home>` workspaces
+and are unaffected. `.active.json`'s schema has been stable since
+v1.0, so workspaces written by older versions don't need migration.
+
 ### Uninstall
 
-Delete the skill folder (or run your runtime's `skills uninstall`).
-The skill never writes outside its own folder during install — your
-imported cards, SOUL.md, and snapshots live in your `<home>/`
-workspace and are unaffected.
+The right cleanup order depends on which targets you used.
+
+**Hermes target only.** Delete the skill folder:
+
+```bash
+rm -rf <YOUR_RUNTIME_SKILLS_DIR>/soultavern
+```
+
+Optionally remove the rendered persona files and card library from
+each `HERMES_HOME` you imported into:
+
+```bash
+rm -rf <HERMES_HOME>/{SOUL.md,HERMES.md,cards}
+```
+
+`SOUL.md` / `HERMES.md` / `cards/` are SoulTavern-written but treated
+as user content (cards, snapshots, your card library), so they're
+yours to keep or wipe.
+
+**OpenClaw target.** Run `delete.py` against each workspace **before**
+removing the skill folder:
+
+```bash
+# For each openclaw workspace SoulTavern was used in:
+python3 <SKILL_DIR>/scripts/current.py --home <ws>          # check active card name
+python3 <SKILL_DIR>/scripts/delete.py  --card <name> --home <ws>
+
+# Then remove the skill folder:
+rm -rf <YOUR_RUNTIME_SKILLS_DIR>/soultavern
+```
+
+The reason: SoulTavern writes a managed section into your workspace's
+`AGENTS.md` (the segment between `<!-- BEGIN soultavern:character -->`
+markers). Deleting the skill folder doesn't strip that section — it
+stays in `AGENTS.md` as inert markdown and the runtime keeps loading
+the character's IDENTITY DIRECTIVE on every fresh session. Running
+`delete.py` against the active card strips the managed section
+cleanly, removes `IDENTITY.md` and `SOUL.md`, and preserves any user
+content in `AGENTS.md` outside the markers.
+
+If you'd rather not run `delete.py`, edit each `AGENTS.md` by hand and
+remove everything from `<!-- BEGIN soultavern:character -->` through
+`<!-- END soultavern:character -->`.
+
+The card library at `<ws>/cards/` (backups + snapshots) is independent
+of the managed section and can be kept or removed separately.
 
 ### Requirements
 

@@ -112,11 +112,67 @@ hermes skills install soultavern
 
 hub 安装器只是把同一份 skill 文件夹放进去，没别的动作。
 
+### 升级
+
+用新版本覆盖 skill 文件夹：
+
+```bash
+git pull   # 在你的 SoulTavern checkout 里
+cp -r SoulTavern/skills/soultavern <YOUR_RUNTIME_SKILLS_DIR>/
+```
+
+（hub 用户重新跑一次 `hermes skills install soultavern` 即可。）
+
+skill 文件夹是纯静态的——里面没有任何运行时生成的状态会被覆盖踩坏。
+已导入的卡、快照历史、已渲染的人格文件都在 `<home>` workspace 里，
+跨升级不变。`.active.json` 的 schema 自 v1.0 起稳定，旧版本的
+workspace 不需要任何迁移。
+
 ### 卸载
 
-删除 skill 文件夹（或者跑 runtime 的 `skills uninstall`）。
-skill 不会在安装时往自己文件夹之外写任何东西——你导入的角色卡、SOUL.md、
-快照都在你的 `<home>/` workspace 里，不受影响。
+干净卸载的步骤取决于用过哪些 target。
+
+**只用了 hermes target：** 直接删 skill 文件夹：
+
+```bash
+rm -rf <YOUR_RUNTIME_SKILLS_DIR>/soultavern
+```
+
+需要的话再清掉每个用过的 `HERMES_HOME` 下的人格文件和卡库：
+
+```bash
+rm -rf <HERMES_HOME>/{SOUL.md,HERMES.md,cards}
+```
+
+`SOUL.md` / `HERMES.md` / `cards/` 是 SoulTavern 写的，但属于
+**用户内容**（人格 + 快照 + 卡片备份），所以归你决定要不要清。
+
+**用了 openclaw target：** 删 skill 文件夹**之前**，先在每个用过的
+workspace 跑一次 `delete.py`：
+
+```bash
+# 对每个用过 SoulTavern 的 openclaw workspace：
+python3 <SKILL_DIR>/scripts/current.py --home <ws>          # 看一下当前 active 卡名
+python3 <SKILL_DIR>/scripts/delete.py  --card <name> --home <ws>
+
+# 然后再删 skill 文件夹：
+rm -rf <YOUR_RUNTIME_SKILLS_DIR>/soultavern
+```
+
+原因：SoulTavern 在 workspace 的 `AGENTS.md` 里写了一段 managed
+section（`<!-- BEGIN soultavern:character -->` 到对应 `END` 标记
+之间的部分）。光删 skill 文件夹不会去除这一段——它会以纯 markdown
+的形式赖在 `AGENTS.md` 里，每次新会话开始 runtime 都会把那段
+IDENTITY DIRECTIVE 加载进去。对 active 卡跑 `delete.py` 会干净地
+strip 掉这段 managed section、删掉 `IDENTITY.md` 和 `SOUL.md`，
+同时保留 `AGENTS.md` marker 之外的用户内容。
+
+如果不想跑 `delete.py`，也可以手工编辑每个 `AGENTS.md`，把
+`<!-- BEGIN soultavern:character -->` 到 `<!-- END soultavern:character -->`
+之间的所有内容（含 marker 本身）删干净。
+
+`<ws>/cards/` 下的卡库（备份 + 快照）和 managed section 是独立
+的，可以分开决定保留或清掉。
 
 ### 依赖
 
