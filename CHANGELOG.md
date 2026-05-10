@@ -1,5 +1,31 @@
 # Changelog
 
+## 2.0.1 — Documentation polish
+
+Five docs-only commits since v2.0.0 — no code or test changes; 217
+tests pass with the same coverage as v2.0.0.
+
+- **README streamlined** to ~230 lines per language (was ~500+).
+  Iteration history, design philosophy, and feature enumerations
+  moved into the references/ docs. Operating-modes dual directory
+  trees collapsed into one.
+- **"LLM choice matters" section added.** Roleplay portrayal quality
+  depends heavily on the model behind the runtime, not just on the
+  card or this skill. Includes a referral link to gptproto.com
+  (clearly disclosed as affiliate) for users who need somewhere to
+  run roleplay-friendly models.
+- **Tagline epigraph** on the top of every README:
+  _"Give your work agent an interesting soul — work and play, not
+  work or play. A programmer's romance."_ Puts the voice back that
+  the technical streamline had scrubbed.
+- **"Sponsored by" section** listing Miko Tavern
+  ([tavern.host](https://tavern.host)) next to "Used by".
+- **`$HERMES_HOME` replaces `~/.hermes-roleplay`** in all examples.
+  The old path was a v0.x convention that implied users should keep
+  roleplay in a separate sandbox HERMES_HOME — contradicts v2.0's
+  "same agent, add a soul" framing. Examples now use the actual env
+  var name that Hermes users have on their machine.
+
 ## 2.0.0 — Skill-folder only (drop CLI install, drop third-party deps)
 
 v2.0 collapses SoulTavern to a single self-contained skill folder. There
