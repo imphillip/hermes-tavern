@@ -1,33 +1,36 @@
-"""Render-only tests for the OpenClaw target's Jinja templates.
+"""Render-only tests for the OpenClaw target's renderers.
 
-These verify the templates produce sensible output in isolation —
-before library integration plumbs them into apply_card / finalize.
-The templates render via the same env as the Hermes side
-(``render._env``), so substitution / sanitization filters apply
-identically.
+v2.0: templates are Python functions on the Target object, not Jinja
+files. These tests call the renderers directly and assert on the
+output. Coverage matches the v1.x test file — same intents, new wiring.
 """
 
 from __future__ import annotations
 
 from soultavern.classify import Classification
-from soultavern.render import _env
 from soultavern.targets import OPENCLAW
+from soultavern.targets.openclaw import (
+    _identity_directive,
+    render_agents_managed_section,
+    render_curated_soul,
+    render_identity,
+    render_soul,
+)
 
 
-# ---------- SOUL.md.openclaw.j2 ----------
+# ---------- SOUL.md (openclaw) ----------
 
 
 def test_openclaw_soul_renders_persona_body_without_identity_directive():
     """The IDENTITY DIRECTIVE belongs in AGENTS.md for OpenClaw,
-    NOT in SOUL.md. The SOUL template should be persona-body only."""
+    NOT in SOUL.md. The SOUL renderer should be persona-body only."""
     data = {
         "name": "Aldous",
         "description": "A bookish wandering scholar.",
         "personality": "Curious, patient.",
         "scenario": "On the road to {{user}}.",
     }
-    env = _env(data["name"], "the visitor")
-    out = env.get_template(OPENCLAW.soul_template).render(
+    out = render_soul(
         data=data,
         metadata=None,
         user_noun="the visitor",
@@ -42,8 +45,7 @@ def test_openclaw_soul_renders_persona_body_without_identity_directive():
     assert "HIGHEST PRIORITY" not in out
     # Director's Notes (output style) should still be present
     assert "Director's Notes" in out
-    # Substitution applied to source content (the literal `{{user}}` in
-    # the footer is intentional, teaching the model the convention)
+    # Substitution applied to source content
     assert "On the road to the visitor." in out
 
 
@@ -51,8 +53,7 @@ def test_openclaw_soul_points_at_agents_md_as_authority():
     """The footer should signal that AGENTS.md is the override
     authority — clarifies precedence to the model."""
     data = {"name": "Aldous", "description": "..."}
-    env = _env(data["name"], "the visitor")
-    out = env.get_template(OPENCLAW.soul_template).render(
+    out = render_soul(
         data=data, metadata=None, user_noun="the visitor",
         trust_system_prompt=False,
     )
@@ -61,23 +62,21 @@ def test_openclaw_soul_points_at_agents_md_as_authority():
 
 
 def test_openclaw_soul_renders_trust_banner():
-    data = {"name": "X", "description": "..."}
-    env = _env("X", "the visitor")
-    out = env.get_template(OPENCLAW.soul_template).render(
-        data=data, metadata=None, user_noun="the visitor",
+    out = render_soul(
+        data={"name": "X", "description": "..."},
+        metadata=None, user_noun="the visitor",
         trust_system_prompt=False,
     )
     assert "Persona content boundary" in out
 
 
-# ---------- AGENTS.md.openclaw.j2 ----------
+# ---------- AGENTS.md (openclaw, managed section) ----------
 
 
 def test_openclaw_agents_renders_identity_directive():
-    """The IDENTITY DIRECTIVE partial must be included — that's the
+    """The IDENTITY DIRECTIVE block must be included — that's the
     whole point of the AGENTS.md managed section."""
-    env = _env("Aldous", "the visitor")
-    out = env.get_template(OPENCLAW.companion_template).render(
+    out = render_agents_managed_section(
         char_name="Aldous",
         user_noun="the visitor",
         extended_files=[],
@@ -86,8 +85,6 @@ def test_openclaw_agents_renders_identity_directive():
     assert "You are **Aldous**" in out
     # Operator-safety-above-character section
     assert "Operator safety" in out
-    # Substitution: char_name and user_noun should both appear
-    assert "Aldous" in out
     assert "the visitor" in out
 
 
@@ -100,8 +97,7 @@ def test_openclaw_agents_renders_lore_index_when_files_present():
         ExtendedFile("cards/x/extended/lore/forest.md", "Forest",
                      "world detail"),
     ]
-    env = _env("Aldous", "the visitor")
-    out = env.get_template(OPENCLAW.companion_template).render(
+    out = render_agents_managed_section(
         char_name="Aldous", user_noun="the visitor",
         extended_files=files,
     )
@@ -111,21 +107,19 @@ def test_openclaw_agents_renders_lore_index_when_files_present():
 
 
 def test_openclaw_agents_skips_lore_section_when_no_files():
-    env = _env("Aldous", "the visitor")
-    out = env.get_template(OPENCLAW.companion_template).render(
+    out = render_agents_managed_section(
         char_name="Aldous", user_noun="the visitor", extended_files=[],
     )
     assert "Lore index" not in out
 
 
-# ---------- IDENTITY.md.openclaw.j2 ----------
+# ---------- IDENTITY.md (openclaw) ----------
 
 
 def test_openclaw_identity_renders_metadata():
-    data = {"name": "Aldous", "tags": ["scholar", "introvert"]}
-    env = _env("Aldous", "the visitor")
-    out = env.get_template("IDENTITY.md.openclaw.j2").render(
-        data=data, avatar_path="",
+    out = render_identity(
+        data={"name": "Aldous", "tags": ["scholar", "introvert"]},
+        char_name="Aldous", user_noun="the visitor", avatar_path="",
     )
     assert "Aldous" in out
     assert "roleplay character" in out
@@ -136,16 +130,16 @@ def test_openclaw_identity_renders_metadata():
 
 
 def test_openclaw_identity_uses_avatar_path_when_provided():
-    data = {"name": "Aldous"}
-    env = _env("Aldous", "the visitor")
-    out = env.get_template("IDENTITY.md.openclaw.j2").render(
-        data=data, avatar_path="avatars/aldous.png",
+    out = render_identity(
+        data={"name": "Aldous"},
+        char_name="Aldous", user_noun="the visitor",
+        avatar_path="avatars/aldous.png",
     )
     assert "avatars/aldous.png" in out
     assert "see source card backup" not in out
 
 
-# ---------- SOUL.md.curated.openclaw.j2 ----------
+# ---------- SOUL.md curated (openclaw) ----------
 
 
 def test_openclaw_curated_soul_renders_picks_only():
@@ -159,13 +153,12 @@ def test_openclaw_curated_soul_renders_picks_only():
         "roleplay_guides": "stay scholarly",
         "examples": "",
     })
-    env = _env("Aldous", "the visitor")
     picks = {
         "identity": classification.categories["identity"],
         "personality": classification.categories["personality"],
         "roleplay_guides": classification.categories["roleplay_guides"],
     }
-    out = env.get_template(OPENCLAW.curated_soul_template).render(
+    out = render_curated_soul(
         data={"name": "Aldous"}, user_noun="the visitor", picks=picks,
     )
     # Picked categories appear
@@ -180,10 +173,7 @@ def test_openclaw_curated_soul_renders_picks_only():
 
 
 def test_openclaw_curated_soul_includes_directors_notes():
-    """Output style still belongs in SOUL.md regardless of curated vs
-    full render — these guide voice, not framing."""
-    env = _env("X", "the visitor")
-    out = env.get_template(OPENCLAW.curated_soul_template).render(
+    out = render_curated_soul(
         data={"name": "X"}, user_noun="the visitor",
         picks={"identity": "X", "personality": "", "roleplay_guides": ""},
     )
@@ -193,10 +183,8 @@ def test_openclaw_curated_soul_includes_directors_notes():
 
 def test_openclaw_curated_soul_points_to_extended_files():
     """The footer hints that extended/ files exist and live behind
-    AGENTS.md's index — same pattern as Hermes curated SOUL but the
-    file authority differs."""
-    env = _env("X", "the visitor")
-    out = env.get_template(OPENCLAW.curated_soul_template).render(
+    AGENTS.md's index."""
+    out = render_curated_soul(
         data={"name": "X"}, user_noun="the visitor",
         picks={"identity": "X.", "personality": "", "roleplay_guides": ""},
     )
@@ -204,17 +192,13 @@ def test_openclaw_curated_soul_points_to_extended_files():
     assert "AGENTS.md" in out
 
 
-# ---------- partial: _identity_directive.openclaw.j2 ----------
+# ---------- IDENTITY DIRECTIVE block ----------
 
 
-def test_identity_directive_partial_substitutes_char_and_user():
-    env = _env("Aldous", "the visitor")
-    out = env.get_template("_identity_directive.openclaw.j2").render(
-        char_name="Aldous", user_noun="the visitor",
-    )
+def test_identity_directive_substitutes_char_and_user():
+    out = _identity_directive("Aldous", "the visitor")
     assert "Aldous" in out
     assert "the visitor" in out
-    # Three required pieces
     assert "Operator safety" in out
     assert "MEMORY.md" in out
     assert "break character" in out

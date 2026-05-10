@@ -114,7 +114,7 @@ OVERSIZE_THRESHOLD = DEFAULT_TARGET.oversize_threshold
 
 _ACTIVE_FILE = ".active.json"
 _TRASH_DIR = ".trash"
-_CARD_SUFFIXES = {".json", ".png", ".yaml", ".yml"}
+_CARD_SUFFIXES = {".json", ".png"}
 _NAME_SAFE = re.compile(r"[^a-zA-Z0-9_.-]+")
 
 
@@ -209,6 +209,25 @@ def _target_for(name: str) -> Target:
     """
     from .targets import TARGETS  # local to avoid module-cycle nag
     return TARGETS.get(name, DEFAULT_TARGET)
+
+
+def _all_managed_filenames() -> list[str]:
+    """Union of every filename any registered target might write.
+
+    Snapshots capture this whole union (not just the active target's
+    file set) so cross-target reverts behave predictably: if the user
+    runs `--target openclaw` and later reverts to a pre-SoulTavern
+    pristine snapshot, the pre-existing AGENTS.md / IDENTITY.md state
+    is fully restored along with SOUL.md.
+    """
+    from .targets import TARGETS  # local to avoid module-cycle nag
+    seen: set[str] = set()
+    for t in TARGETS.values():
+        seen.add(t.soul_filename)
+        seen.add(t.companion_filename)
+        for ef in t.extra_files:
+            seen.add(ef.filename)
+    return sorted(seen)
 
 
 def _extended_dir_for(card_file: str, home: Path) -> Path:
@@ -584,7 +603,7 @@ def apply_card(
     after the mutation completes — allowing later ``revert`` operations.
     """
     snap_mod.ensure_pristine(
-        home, soul=soul_path(home, target), hermes=hermes_path(home, target),
+        home, filenames=_all_managed_filenames(), target=target.name,
     )
 
     data = load_card(card_path)
@@ -666,8 +685,8 @@ def apply_card(
             action=action,
             name=char_name,
             card_file=card_path.name,
-            soul=soul_path(home, target),
-            hermes=hermes_path(home, target),
+            filenames=_all_managed_filenames(),
+            target=target.name,
             active_record=asdict(record),
         )
         return ApplyOutcome(
@@ -797,8 +816,8 @@ def _finalize_in_place(
         action=action,
         name=char_name,
         card_file=card_path.name,
-        soul=soul_path(home, target),
-        hermes=hermes_path(home, target),
+        filenames=_all_managed_filenames(),
+        target=target.name,
         active_record=asdict(record),
     )
     return ApplyOutcome(
@@ -829,7 +848,7 @@ def finalize_card(
     category files yet — the operator probably skipped the agent step.
     """
     snap_mod.ensure_pristine(
-        home, soul=soul_path(home, target), hermes=hermes_path(home, target),
+        home, filenames=_all_managed_filenames(), target=target.name,
     )
 
     card_path = find_card(home, query)
@@ -1011,22 +1030,28 @@ def list_history(home: Path) -> list[Snapshot]:
 
 
 def revert_to(home: Path, query: str) -> Snapshot:
-    """Restore SOUL.md / HERMES.md from a snapshot named by ``query``.
+    """Restore every managed agent file from a snapshot named by ``query``.
 
     ``query`` may be ``"pristine"``, ``"previous"``, a numeric snapshot
     id, or a case-insensitive name prefix. The current state is replaced
-    in-place — including correctly removing live files when the target
+    in-place — including correctly unlinking live files when the
     snapshot didn't have them. The active record is restored from the
-    snapshot's manifest, or cleared if the target had none. The revert
-    itself is recorded as a new snapshot for history continuity.
-    """
-    target = snap_mod.find_snapshot(home, query)
-    snap_mod.restore_files(target, home, soul=soul_path(home), hermes=hermes_path(home))
+    snapshot's manifest, or cleared if the snapshot had none. The
+    revert itself is recorded as a new snapshot for history continuity.
 
-    if target.active_record:
+    Coverage matches the captured file set in the snapshot's manifest:
+    SOUL.md, the relevant companion file, and any target-specific
+    extras (IDENTITY.md for openclaw). Legacy snapshots (pre-v2.0,
+    only SOUL.md + HERMES.md captured) restore those two and leave
+    other files alone.
+    """
+    snap = snap_mod.find_snapshot(home, query)
+    snap_mod.restore_files(snap, home)
+
+    if snap.active_record:
         record = ActiveRecord(
             **{
-                k: target.active_record.get(k)
+                k: snap.active_record.get(k)
                 for k in ActiveRecord.__dataclass_fields__
             }
         )
@@ -1037,10 +1062,10 @@ def revert_to(home: Path, query: str) -> Snapshot:
     snap_mod.take_snapshot(
         home,
         action="revert",
-        name=f"revert→{target.id}/{target.name}",
-        card_file=target.card_file,
-        soul=soul_path(home),
-        hermes=hermes_path(home),
-        active_record=target.active_record,
+        name=f"revert→{snap.id}/{snap.name}",
+        card_file=snap.card_file,
+        filenames=_all_managed_filenames(),
+        target=snap.target,
+        active_record=snap.active_record,
     )
-    return target
+    return snap

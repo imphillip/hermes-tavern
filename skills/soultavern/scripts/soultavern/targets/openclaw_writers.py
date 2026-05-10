@@ -30,7 +30,7 @@ DEFAULT_MARKER = "soultavern:character"
 
 _MANAGED_NOTE = (
     "<!-- managed by soultavern; safe to delete the markers + content "
-    "between them, or run `soultavern delete --target openclaw` -->"
+    "between them, or run SoulTavern's delete.py against this workspace -->"
 )
 
 

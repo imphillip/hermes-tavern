@@ -19,5 +19,8 @@ jobs:
           python-version: ${{ matrix.python }}
           cache: pip
           cache-dependency-path: pyproject.toml
-      - run: pip install -e ".[dev]"
+      # v2.0+ has zero runtime deps and no installable build target.
+      # tests/conftest.py adds the skill's lib/ to sys.path on its own,
+      # so we only need pytest.
+      - run: pip install pytest
       - run: pytest -q

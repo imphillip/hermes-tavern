@@ -127,7 +127,7 @@ def test_switch_records_switch_action(home: Path, fixtures_dir: Path):
 def test_revert_pristine_when_only_pristine_exists_is_noop(home: Path):
     """Synthesise a pristine-only history (e.g. after `revert --to pristine`
     plus some manual cleanup), ensure revert to pristine still works."""
-    snapshots.ensure_pristine(home, soul=home / "SOUL.md", hermes=home / "HERMES.md")
+    snapshots.ensure_pristine(home, filenames=["SOUL.md", "HERMES.md"], target="hermes")
     target = library.revert_to(home, "pristine")
     assert target.action == "pristine"
     # Now there's pristine + revert in history
@@ -141,7 +141,7 @@ def test_revert_unknown_id_raises(home: Path, fixtures_dir: Path):
 
 
 def test_previous_with_only_pristine_raises(home: Path):
-    snapshots.ensure_pristine(home, soul=home / "SOUL.md", hermes=home / "HERMES.md")
+    snapshots.ensure_pristine(home, filenames=["SOUL.md", "HERMES.md"], target="hermes")
     with pytest.raises(snapshots.SnapshotError):
         library.revert_to(home, "previous")
 

@@ -26,9 +26,9 @@ def _resolve_target(name: str) -> Target:
     skeleton targets with a clear message.
 
     Skeleton targets (``implemented=False``) are listed by ``--help`` so
-    users can discover the migration direction, but actually invoking
-    them in v0.6.x is rejected — those slots fill in step 3 of the
-    SoulTavern migration.
+    users can discover the migration direction, but invoking them is
+    rejected. v2.0 ships hermes + openclaw as production; generic is
+    a skeleton.
     """
     target = TARGETS.get(name)
     if target is None:
@@ -39,8 +39,7 @@ def _resolve_target(name: str) -> Target:
     if not target.implemented:
         raise SystemExit(
             f"soultavern: --target {name!r} is registered but not yet "
-            f"implemented in this release. v0.6.x supports --target hermes "
-            f"only; openclaw and generic land in v0.7+."
+            f"implemented. Production targets: hermes, openclaw."
         )
     return target
 
@@ -84,12 +83,12 @@ def _build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", metavar="COMMAND")
 
     p_import = sub.add_parser("import", help="Import a card and make it the active persona.")
-    p_import.add_argument("--card", required=True, type=Path, help="Path to .json/.png/.yaml card")
+    p_import.add_argument("--card", required=True, type=Path, help="Path to .json/.png card")
     p_import.add_argument("--home", required=True, type=Path, help="Target HERMES_HOME directory")
     p_import.add_argument("--target", default=DEFAULT_TARGET.name,
                           choices=sorted(TARGETS.keys()),
                           help=f"Agent runtime target (default: {DEFAULT_TARGET.name}). "
-                               "openclaw / generic are skeletons in v0.6.x.")
+                               "Production: hermes, openclaw. Skeleton: generic.")
     p_import.add_argument("--user-noun", default=library.DEFAULT_USER_NOUN,
                           help="How {{user}} should be addressed (default: 'the visitor')")
     p_import.add_argument("--overwrite", action="store_true", help="Replace existing SOUL.md / HERMES.md")
@@ -387,15 +386,24 @@ def _cmd_history(args: argparse.Namespace) -> int:
 
 
 def _cmd_revert(args: argparse.Namespace) -> int:
-    target = library.revert_to(args.home, args.target)
-    soul_state = "yes" if target.has_soul_md else "(none — live SOUL.md removed)"
-    hermes_state = "yes" if target.has_hermes_md else "(none — live HERMES.md removed)"
-    print(f"reverted to snapshot {target.id} ({target.action}: {target.name})")
-    print(f"  SOUL.md:   {soul_state}")
-    print(f"  HERMES.md: {hermes_state}")
-    print(f"\nto activate: cd {args.home} && hermes", file=sys.stderr)
-    print("(if hermes is already running in a channel, use /new for a fresh "
-          "session — or /reset to clear and reload — to apply this revert)",
+    snap = library.revert_to(args.home, args.target)
+    print(f"reverted to snapshot {snap.id} ({snap.action}: {snap.name})")
+    # Print one line per file the snapshot tracked, showing whether it
+    # was restored or removed. Falls back to the legacy SOUL/HERMES
+    # pair when the snapshot is from a pre-v2.0 manifest with no
+    # `captured` dict.
+    captured = snap.captured or {
+        "SOUL.md": snap.has_soul_md,
+        "HERMES.md": snap.has_hermes_md,
+    }
+    longest = max((len(fn) for fn in captured), default=8)
+    for fn in sorted(captured):
+        present = captured[fn]
+        state = "restored" if present else f"(none — live {fn} removed)"
+        print(f"  {fn.ljust(longest)} : {state}")
+    print(f"\nto activate: start your runtime from {args.home}", file=sys.stderr)
+    print("(if the runtime is already running, start a fresh session — for "
+          "Hermes use /new or /reset — to apply this revert)",
           file=sys.stderr)
     return _EXIT_OK
 
@@ -472,12 +480,12 @@ def _report_outcome(home: Path, outcome: library.ApplyOutcome, library_path: Pat
             "entries to fit budget",
             file=sys.stderr,
         )
-    print(f"\nto activate: cd {home} && hermes", file=sys.stderr)
+    print(f"\nto activate: start your runtime from {home}", file=sys.stderr)
     if target.companion_filename == "HERMES.md":
-        print("(HERMES.md is read from cwd, not HERMES_HOME — must launch from "
-              "inside the home directory)", file=sys.stderr)
-    print("(if hermes is already running in a channel, use /new for a fresh "
-          "session — or /reset to clear and reload — to apply this card)",
+        print("(Hermes reads HERMES.md from cwd, not HERMES_HOME — must launch "
+              "from inside the home directory)", file=sys.stderr)
+    print("(if the runtime is already running, start a fresh session — for "
+          "Hermes use /new or /reset — to apply this card)",
           file=sys.stderr)
 
 

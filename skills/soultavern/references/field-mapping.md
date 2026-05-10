@@ -1,9 +1,11 @@
-# V2 → SOUL.md / HERMES.md mapping
+# V2 → SOUL.md / companion-file mapping
 
-Exact rules HermesTavern follows when rendering a card. The field order
-below is the order they appear in the output file.
+Exact rules SoulTavern follows when rendering a card. The field order
+below is the order they appear in the output file. The mapping is
+described from the `--target hermes` perspective; differences for
+`--target openclaw` are called out at the end.
 
-## SOUL.md
+## SOUL.md (hermes target)
 
 | Source (`data.*`) | Output section | Notes |
 |---|---|---|
@@ -28,11 +30,13 @@ control-char strip — see `security.md`).
 
 ### Budget
 
-`SOUL.md` must stay ≤ **19 000 characters** (1 000-char buffer below the
-20 000-char Hermes cap). Exceeding this raises `BudgetExceededError` —
-trim `description`, `personality`, or `mes_example` to fit.
+`SOUL.md` must stay ≤ **19 000 characters** for `--target hermes`
+(1 000-char buffer below the 20 000-char Hermes cap), or ≤ **11 000
+characters** for `--target openclaw` (1k below OpenClaw's 12k per-file
+cap). Exceeding this raises `BudgetExceededError` — trim
+`description`, `personality`, or `mes_example` to fit.
 
-## HERMES.md (only if `data.character_book` is present)
+## HERMES.md (hermes target, only if `data.character_book` is present)
 
 | Source (`character_book.*`) | Output | Notes |
 |---|---|---|
@@ -45,17 +49,34 @@ trim `description`, `personality`, or `mes_example` to fit.
 ### Entry filtering and ordering
 
 - `entries[i].enabled == false` → entry is dropped entirely.
-- Entries are sorted by `insertion_order` ascending. Entries without an
-  order go to the end (in original order).
-- Keyword gating (`keys`, `constant`) is **not** enforced — every enabled
-  entry is rendered as always-on context. This trades faithfulness for
-  long-context simplicity.
+- Entries are sorted by `insertion_order` ascending. Entries without
+  an order go to the end (in original order).
+- Keyword gating (`keys`, `constant`) is **not** enforced — every
+  enabled entry is rendered as always-on context. This trades
+  faithfulness for long-context simplicity.
 
 ### Budget
 
 `HERMES.md` must stay ≤ **19 000 characters**. If the rendered file
-overflows, HermesTavern drops trailing entries (highest `insertion_order`
-first) and prints a warning to stderr. It does not raise.
+overflows, SoulTavern drops trailing entries (highest
+`insertion_order` first) and prints a warning to stderr. It does not
+raise.
+
+## openclaw target differences
+
+`--target openclaw` writes three files instead of two:
+
+| File | What changes vs. hermes target |
+|---|---|
+| `SOUL.md` | Persona body only — **no** IDENTITY DIRECTIVE here (it lives in AGENTS.md, which outranks SOUL.md in OpenClaw's loader). The Director's Notes (output style + language adaptation) and trust banner stay in SOUL.md. Budget: 11 000 chars. |
+| `AGENTS.md` (managed section) | Replaces what would be HERMES.md. Carries the IDENTITY DIRECTIVE plus the lore index. Only the segment between `<!-- BEGIN soultavern:character -->` and `<!-- END soultavern:character -->` is touched; user content outside the markers is preserved on every import / switch / delete / revert. Budget: 6 000 chars (the rest of AGENTS.md is reserved for the user's own content). |
+| `IDENTITY.md` | Small metadata file (name, vibe, avatar). Budget: 2 000 chars. |
+
+The oversized-card threshold for `--target openclaw` is 9 000 chars
+(75% of the 12k per-file cap) instead of 15 000.
+
+See `openclaw-target.md` for the design rationale and managed-section
+write strategy.
 
 ## Placeholder substitution
 

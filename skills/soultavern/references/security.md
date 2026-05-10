@@ -5,7 +5,7 @@ from `chub.ai`, a forum download, or a friend who got it from somewhere
 they don't remember. Treat them the way you'd treat a random `.docx`
 attachment: probably fine, occasionally weaponised.
 
-HermesTavern's threat model focuses on the *card-to-prompt* boundary.
+SoulTavern's threat model focuses on the *card-to-prompt* boundary.
 Three defence layers run on every import / switch / validate. None of
 them stops a determined attacker; together they make the most common
 prompt-injection patterns visible and reduce the attack surface that
@@ -13,22 +13,26 @@ naive operators trip over.
 
 ## Layer 1 — identity directive + visible trust boundary
 
-`SOUL.md` opens with two structural defences:
+The persona files open with two structural defences. The IDENTITY
+DIRECTIVE lives in whichever file has the highest loader priority on
+the runtime — `SOUL.md` for `--target hermes`, the `AGENTS.md`
+managed section for `--target openclaw`. The trust banner lives in
+`SOUL.md` for both targets.
 
-**1. `# IDENTITY DIRECTIVE — HIGHEST PRIORITY`** at the absolute top.
-Auto-injected by HermesTavern for every imported card (no opt-out).
-Pre-empts the platform-level "you are Hermes Agent / an AI assistant
-on \<channel\>" framing that hermes hard-codes into its system prompt.
-Without it, the model collapses to the AI-assistant default and
-answers things like "I'm an AI assistant. If we're roleplaying, I'm
-currently portraying X" instead of just answering as the character.
+**1. `# IDENTITY DIRECTIVE — HIGHEST PRIORITY`** at the absolute top
+of the highest-priority file. Auto-injected for every imported card
+(no opt-out). Pre-empts the platform-level "you are an AI assistant"
+framing that runtimes hard-code into their system prompts. Without
+it, the model collapses to the AI-assistant default and answers
+things like "I'm an AI assistant. If we're roleplaying, I'm currently
+portraying X" instead of just answering as the character.
 
 The directive:
 
 - binds the character's name at render time (`You are **{name}**.`)
 - lists the framing patterns to ignore as "stage directions"
 - explicitly forbids meta-disclosure ("I'm portraying …", "if we're
-  roleplaying then …", references to Hermes / Telegram / the model)
+  roleplaying then …", references to the runtime / channel / model)
 - explicitly **preserves operator-level safety** so it cannot be used
   to construct a "be the character even when asked something harmful"
   loophole
@@ -68,13 +72,14 @@ written to disk:
   - U+FEFF zero-width no-break space (BOM)
   - All other C0 / C1 control codes
 
-YAML cards are loaded with `yaml.safe_load`; PNG cards extract only the
-`chara` tEXt chunk. There is no execution path for embedded code in any
-supported format.
+PNG cards extract only the `chara` text chunk (tEXt / iTXt / zTXt) via a
+stdlib chunk parser; the rest of the PNG bytes are ignored. JSON cards
+are loaded with `json.loads`. There is no execution path for embedded
+code in any supported format. (YAML support was dropped in v2.0.)
 
 ## Layer 3 — red-flag pattern scan
 
-`hermes-tavern validate` and every `import` / `switch` run `scan_card()`
+`validate.py` and every `import` / `switch` run `scan_card()`
 over the parsed payload and report any matches to stderr (or to stdout
 in the `validate` listing). Findings are tagged by category:
 
@@ -102,10 +107,10 @@ decide whether to keep it.
   but does not eliminate the attack surface; ultimately the model
   decides whether to comply.
 - **Tool / channel abuse.** If the model is convinced to call a
-  destructive tool, the damage happens at the Hermes side. Configure
-  `platform_toolsets` allowlists, rate limits, and channel-level safety
-  on Hermes — that is the real perimeter. HermesTavern is explicitly
-  out of scope for runtime defence.
+  destructive tool, the damage happens at the runtime side. Configure
+  the runtime's allowlists (Hermes `platform_toolsets`), rate limits,
+  and channel-level safety there — that is the real perimeter.
+  SoulTavern is explicitly out of scope for runtime defence.
 - **Card metadata exfiltration.** Cards can carry arbitrary
   `extensions` blobs. We preserve them as HTML comments so they don't
   enter the prompt; they are visible in the rendered file if you grep
@@ -116,13 +121,13 @@ decide whether to keep it.
 
 ## Operator workflow recommendations
 
-1. Run `hermes-tavern validate --card <card>` on any new download
-   *before* importing.
-2. If the scan output looks clean and the card author is unknown, do a
-   `--dry-run` import to read the rendered SOUL.md before writing.
+1. Run `python3 SKILL_DIR/scripts/validate.py --card <card>` on any
+   new download *before* importing.
+2. If the scan output looks clean and the card author is unknown, do
+   a `--dry-run` import to read the rendered SOUL.md before writing.
 3. If you intend to use `--trust-system-prompt`, re-read those two
    fields in the source card and confirm they look like author notes,
    not operator directives.
-4. Configure your Hermes channel-level safety (`platform_toolsets`,
-   allowlists) independently. HermesTavern does not, will not, and
-   should not touch that.
+4. Configure your runtime's channel-level safety (Hermes
+   `platform_toolsets`, allowlists, etc.) independently. SoulTavern
+   does not, will not, and should not touch that.
