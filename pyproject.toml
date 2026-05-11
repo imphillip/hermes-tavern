@@ -1,6 +1,6 @@
 [project]
 name = "soultavern"
-version = "2.0.2"
+version = "2.0.3"
 description = "Skill-folder-only SillyTavern V2 character card importer for Hermes / OpenClaw / generic agent runtimes."
 readme = "README.md"
 license = { text = "MIT" }

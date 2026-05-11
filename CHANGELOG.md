@@ -1,5 +1,39 @@
 # Changelog
 
+## 2.0.3 — Pre-submission cleanup sweep
+
+Audit pass before submitting to awesome-agent-skills. No behavior
+changes; 217 tests pass.
+
+- **Broken OpenClaw link fixed.** READMEs (× 3 langs) and
+  `references/openclaw-target.md` linked
+  `github.com/imphillip/openclaw` (404). Correct upstream is
+  `github.com/openclaw/openclaw`.
+- **Stale `hermes-tavern` / `HermesTavern` strings swept.** The v2.0
+  CLI removal had left a few v0.x references in places that bleed into
+  agent or user output:
+  - The banner written into every rendered `HERMES.md` now reads
+    `SoulTavern: imported from a SillyTavern V2 character card.`
+    (was `HermesTavern:` — visible in the persona file every import).
+  - The staging-folder README that drives the agent's oversized-card
+    flow now points at `import.py` / `finalize.py` and
+    `soultavern/SKILL.md` (was `hermes-tavern import` / `finalize` /
+    `hermes-tavern/SKILL.md`).
+  - `--help` text for `history` now says `no SoulTavern files` (was
+    `no HermesTavern files`).
+  - Engine docstrings (`library.py`, `staging.py`, `classify.py`) and
+    one test docstring brought into line.
+- **README × 3 now point at the release zip.** Every GitHub release
+  attaches `soultavern-skills.zip` — the install section advertises it
+  alongside `git clone` for users who don't want a clone.
+- **`.gitignore` stale comment dropped.** v2.0 removed per-skill
+  `assets/*.whl` distribution; the comment about wheels being checked
+  in is dead weight.
+
+Intentional historical references kept: CHANGELOG entries, lineage
+phrase `TavernAI → SillyTavern → HermesTavern → SoulTavern` in
+`SKILL.md` / `__init__.py`, snapshot-test comment.
+
 ## 2.0.2 — Version-stamp consistency
 
 v2.0.1 shipped with the version field in
