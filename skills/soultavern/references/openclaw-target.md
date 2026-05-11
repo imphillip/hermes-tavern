@@ -6,7 +6,7 @@ the current production behavior — this is the source of truth for
 budget constants, file-by-file write strategy, and design rationale.
 
 Source-of-truth references throughout point at the [OpenClaw
-repository](https://github.com/imphillip/openclaw) (paths shown are
+repository](https://github.com/openclaw/openclaw) (paths shown are
 relative to its root).
 
 ## Loader order

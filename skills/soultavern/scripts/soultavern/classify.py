@@ -4,7 +4,7 @@ per-category content.
 
 This module is intentionally LLM-call-free. The actual semantic
 categorization is done by the agent (with whatever LLM tools it has,
-guided by ``hermes-tavern/SKILL.md``); this module only owns:
+guided by ``soultavern/SKILL.md``); this module only owns:
 
 - the canonical V2 category names + display titles + summaries
 - the ``Classification`` dataclass that ``render`` and ``extended``

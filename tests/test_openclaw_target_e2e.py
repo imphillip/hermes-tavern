@@ -313,8 +313,8 @@ def test_openclaw_switch_between_cards(home: Path, fixtures_dir: Path):
 def test_cli_openclaw_target_writes_three_files(
     tmp_path: Path, fixtures_dir: Path, capsys: pytest.CaptureFixture[str],
 ):
-    """`hermes-tavern import --target openclaw` produces SOUL +
-    AGENTS managed section + IDENTITY.md."""
+    """`import.py --target openclaw` produces SOUL + AGENTS managed
+    section + IDENTITY.md."""
     from soultavern.cli import main
 
     home = tmp_path / "home"

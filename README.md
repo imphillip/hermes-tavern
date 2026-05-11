@@ -17,7 +17,7 @@ production targets:
 - `--target hermes` — writes `SOUL.md` + `HERMES.md` for
   [Hermes-Agent](https://github.com/NousResearch/hermes-agent)
 - `--target openclaw` — writes `SOUL.md` + `AGENTS.md` managed-section +
-  `IDENTITY.md` for an [OpenClaw](https://github.com/imphillip/openclaw) workspace
+  `IDENTITY.md` for an [OpenClaw](https://github.com/openclaw/openclaw) workspace
 
 No middleware, no patches, no relays — and **no install**. SoulTavern is one
 self-contained skill folder with zero third-party Python dependencies. Drop the
@@ -30,6 +30,11 @@ on demand.
 git clone https://github.com/imphillip/SoulTavern.git
 cp -r SoulTavern/skills/soultavern <YOUR_RUNTIME_SKILLS_DIR>/
 ```
+
+Or grab the pre-bundled skill folder from a tagged release —
+[`soultavern-skills.zip`](https://github.com/imphillip/SoulTavern/releases/latest)
+on every GitHub release contains `skills/soultavern/` ready to unzip into
+`<YOUR_RUNTIME_SKILLS_DIR>/`.
 
 Typical destinations: `~/.openclaw/workspace/skills/`, your Hermes skills
 directory, or `~/.claude/skills/` for Claude Code. Anywhere your runtime scans

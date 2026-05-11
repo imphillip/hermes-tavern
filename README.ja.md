@@ -16,7 +16,7 @@ agent runtime がセッション開始時に読み込むマークダウンシス
 
 - `--target hermes` —— [Hermes-Agent](https://github.com/NousResearch/hermes-agent)
   用の `SOUL.md` + `HERMES.md` を出力
-- `--target openclaw` —— [OpenClaw](https://github.com/imphillip/openclaw)
+- `--target openclaw` —— [OpenClaw](https://github.com/openclaw/openclaw)
   workspace 用の `SOUL.md` + `AGENTS.md` managed-section + `IDENTITY.md` を出力
 
 ミドルウェアもパッチもリレーも、**インストールも不要**。SoulTavern は
@@ -30,6 +30,12 @@ agent が必要に応じてスクリプトを呼び出します。
 git clone https://github.com/imphillip/SoulTavern.git
 cp -r SoulTavern/skills/soultavern <YOUR_RUNTIME_SKILLS_DIR>/
 ```
+
+または、タグ付き release にバンドルされた skill フォルダを利用できます——
+各 GitHub release に同梱の
+[`soultavern-skills.zip`](https://github.com/imphillip/SoulTavern/releases/latest)
+を解凍すると `skills/soultavern/` が出てくるので、そのまま
+`<YOUR_RUNTIME_SKILLS_DIR>/` 配下に置けば動きます。
 
 典型例: `~/.openclaw/workspace/skills/`、Hermes の skills ディレクトリ、
 Claude Code なら `~/.claude/skills/`。runtime が skill をスキャンする

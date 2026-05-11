@@ -33,12 +33,12 @@ The flow on oversize is:
    per-entry payloads, then raises :class:`NeedsAgentCategorizationError`.
 3. The agent (working from the SKILL.md procedure) reads ``source.md``
    and writes one ``extended/<category>.md`` per V2 category.
-4. The user runs ``hermes-tavern finalize``, which calls
-   :func:`finalize_card` here to assemble the curated SOUL.md and the
-   indexed HERMES.md from the on-disk material.
+4. The user runs ``finalize.py``, which calls :func:`finalize_card`
+   here to assemble the curated SOUL.md and the indexed HERMES.md from
+   the on-disk material.
 
-HermesTavern intentionally **never writes AGENTS.md, MEMORY.md, or
-USER.md**. AGENTS.md is shadowed by HERMES.md per Hermes's loader
+The hermes target intentionally **never writes AGENTS.md, MEMORY.md,
+or USER.md**. AGENTS.md is shadowed by HERMES.md per Hermes's loader
 priority; MEMORY.md and USER.md are owned by the agent itself.
 
 Note: SOUL.md is read relative to HERMES_HOME, but HERMES.md is read

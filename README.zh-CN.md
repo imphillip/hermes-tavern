@@ -17,7 +17,7 @@ SoulTavern 把 SillyTavern V2 角色卡（`.png` / `.json`）转成 agent runtim
   [Hermes-Agent](https://github.com/NousResearch/hermes-agent) 用的
   `SOUL.md` + `HERMES.md`
 - `--target openclaw`——输出
-  [OpenClaw](https://github.com/imphillip/openclaw) workspace 用的
+  [OpenClaw](https://github.com/openclaw/openclaw) workspace 用的
   `SOUL.md` + `AGENTS.md` managed-section + `IDENTITY.md`
 
 不需要中间件、不打补丁、不做转发——**也不需要安装**。SoulTavern 是一个
@@ -30,6 +30,10 @@ skill 目录，agent 会按需调用其中的脚本。
 git clone https://github.com/imphillip/SoulTavern.git
 cp -r SoulTavern/skills/soultavern <YOUR_RUNTIME_SKILLS_DIR>/
 ```
+
+或者下载已经打包好的 skill 文件夹——每个 GitHub release 都附带
+[`soultavern-skills.zip`](https://github.com/imphillip/SoulTavern/releases/latest)，
+解压即得 `skills/soultavern/`，丢进 `<YOUR_RUNTIME_SKILLS_DIR>/` 即可。
 
 典型目标：`~/.openclaw/workspace/skills/`、Hermes 的 skills 目录、或
 Claude Code 的 `~/.claude/skills/`。runtime 扫 skill 的任何目录都行。

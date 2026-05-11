@@ -381,7 +381,7 @@ def _cmd_history(args: argparse.Namespace) -> int:
         when = s.created_at.split("+")[0]
         print(f"{s.id:<6} {when:<20} {s.action:<10} {s.name:<30} {marker}")
     print("\n(files: S=SOUL.md present, H=HERMES.md present; "
-          "'--' = pristine state with no HermesTavern files)")
+          "'--' = pristine state with no SoulTavern files)")
     return _EXIT_OK
 
 

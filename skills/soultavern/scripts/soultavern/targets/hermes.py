@@ -88,7 +88,7 @@ def render_soul(
 
     meta_block = _t.render_metadata_comment(
         metadata,
-        "HermesTavern: imported from a SillyTavern V2 character card.",
+        "SoulTavern: imported from a SillyTavern V2 character card.",
     )
     if meta_block:
         parts.append(meta_block)

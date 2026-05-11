@@ -9,8 +9,6 @@ __pycache__/
 htmlcov/
 dist/
 build/
-# The wheels under each skill's assets/ ARE checked in (see install.sh
-# bootstrap path); only the top-level dist/ from `python -m build` is ignored.
 .venv/
 venv/
 .env
